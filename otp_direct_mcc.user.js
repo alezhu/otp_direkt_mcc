@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.1.1
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
@@ -942,7 +942,7 @@ color:blue;
                         } else {
                             fCB = Math.round(fCost * iPercent) / 100 + 0.0;
                             var aDate = sDate.split("/");
-                            var sMonth = aDate[1];
+                            var sMonth = "" + aDate[1] + "." + aDate[2];
                             if (fCB > 0) {
                                 if (!oCashBackPerMonth[sMonth]) {
                                     oCashBackPerMonth[sMonth] = 0;
