@@ -1,0 +1,1055 @@
+// ==UserScript==
+// @name         OTP MCC Codes
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Show MCC in OTP Direct
+// @author       alezhu
+// @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
+// @match        https://direkt.otpbank.ru/homebank/do/bankkartya/kartyaTranzakcioReszletek*
+// @grant        GM_addStyle
+// ==/UserScript==
+
+
+GM_addStyle(`
+td.numerikus > span.cb0 {
+color:red;
+}
+
+td.numerikus > span.cb1 {
+color:black;
+}
+
+td.numerikus > span.cb7 {
+color:blue;
+}
+`);
+
+(function($) {
+    'use strict';
+    var LOG = 1;
+    var PREFIX = "AZ";
+
+    function log(data) {
+        if (LOG) console.log(data);
+    }
+
+    function getCardCategory(last4Digit) {
+        return localStorage[PREFIX + ".card" + last4Digit];
+    }
+
+    function setCardCategory(last4Digit, sCategory) {
+        localStorage[PREFIX + ".card" + last4Digit] = sCategory;
+    }
+
+    function getMCC4Category(oType, sMC) {
+        if (!sMC) return null;
+        var result = oType.category[sMC];
+        if (!result) {
+            var sUC_MC = sMC.toUpperCase();
+            for (var sProp in oType.category) {
+                if (sProp.toUpperCase().search(sUC_MC) >= 0) {
+                    result = oType.category[sProp];
+                    break;
+                }
+            }
+        }
+        if (result && Array.isArray(result)) {
+            result = result[0]; //Cant detect MCC exactly
+        }
+        return result;
+    }
+
+    function getOperationFromCache(sCard, sDate, sPlace) {
+        return localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
+    }
+
+    function setOperationToCache(sCard, sDate, sPlace, sData) {
+        localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = sData;
+    }
+
+    function getOperationAsync(sCard, sDate, sPlace, fnGetOtpCategory) {
+        var sOperation = getOperationFromCache(sCard, sDate, sPlace);
+        if (sOperation) return Promise.resolve(sOperation);
+        return new Promise((resolve, reject) => {
+            fnGetOtpCategory()
+                .then(otpCat => {
+                        var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
+                        if (sMCC) {
+                            sOperation = sMCC + ":0";
+                        } else {
+                            if (sCard) {
+                                var sCardCategory = getCardCategory(sCard);
+                                if (sCardCategory) {
+                                    var oCardType = CardTypes[sCardCategory];
+                                    if (oCardType) {
+                                        sMCC = getMCC4Category(oCardType, otpCat);
+                                        if (sMCC) {
+                                            sOperation = sMCC + ":7";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (sOperation) {
+                            setOperationToCache(sCard, sDate, sPlace, sOperation);
+                        } else sOperation = ":1"; //No MCC detection for 1% cashback
+                        resolve(sOperation);
+                    },
+                    err => reject(err));
+        });
+    }
+
+    var CardTypes = {
+        no_cb: {
+            exclude: true,
+            category: {
+                "Telecommunications Equipment including telephone sales": "4812",
+                "Telecommunication srvice including local and long distance calls, credit card calls, calls through use of magnetic stripe reading telephones, fax serv": "4814",
+                "Fax services, Telecommunication Services": "4814",
+                "Computer Network Services": "4816",
+                "Money Orders – Wire Transfer": "4829",
+                "Pawn Shops and Salvage Yards": "5933",
+                "Financial Institutions – Manual Cash Disbursements": [
+                    "6010",
+                    "6011"
+                ],
+                "Financial Institutions – Merchandise and Services": "6012",
+                "Non-Financial Institutions – Foreign Currency, Money Orders (not wire transfer) and Travelers Cheques": "6051",
+                "Security Brokers/Dealers": "6211",
+                "Insurance Sales, Underwriting, and Premiums": "6300",
+                "Miscellaneous Personal Services ( not elsewhere classifies)": "7299",
+                "Advertising Services": "7311",
+                "Consumer Credit Reporting Agencies": "7321",
+                "Computer Programming, Integrated Systems Design and Data Processing Services": "7372",
+                "Business Services, Not Elsewhere Classified": "7399",
+                "Betting (including Lottery Tickets, Casino Gaming Chips, Off-track Betting and Wagers at Race Tracks)": "7995",
+                "Charitable and Social Service Organizations": "8398",
+                "Political Organizations": "8651",
+                "Professional Services ( Not Elsewhere Defined)": "8999",
+                "Fines": "9222",
+                "Bail and Bond Payments": "9223",
+                "Tax Payments": "9311",
+                "Government Services ( Not Elsewhere Classified)": "9399"
+            },
+        },
+        family: {
+            pattern: /семейная/i,
+            category: {
+                "Ambulance Services": "4119",
+                "Electric, Gas, Sanitary and Water Utilities": "4900",
+                "Utilities - electric, gas, water, sanitary": "4900",
+                "Drugs, Drug Proprietors, and Druggist’s Sundries": "5122",
+                "Grocery Stores, Supermarkets": "5411",
+                "Misc. Food Stores – Convenience Stores and Specialty Markets": "5499",
+                "Children’s and Infant’s Wear Stores": "5641",
+                "Drug Stores and Pharmacies": "5912",
+                "Drug stores, pharmacies": "5912",
+                "Hobby, Toy, and Game Shops": "5945",
+                "Hearing Aids – Sales, Service, and Supply Stores": "5975",
+                "Orthopedic Goods Prosthetic Devices": "5976",
+                "Doctors and Physicians (Not Elsewhere Classified)": "8011",
+                "Dentists and Orthodontists": "8021",
+                "Osteopaths": "8031",
+                "Chiropractors": "8041",
+                "Optometrists and Ophthalmologists": "8042",
+                "Opticians, Opticians Goods and Eyeglasses": "8043",
+                "Opticians, Optical Goods, and Eyeglasses (no longer validfor first presentments)": "8044",
+                "Podiatrists and Chiropodists": "8049",
+                "Nursing and Personal Care Facilities": "8050",
+                "Hospitals": "8062",
+                "Medical and Dental Laboratories": "8071",
+                "Medical Services and Health Practitioners (Not Elsewhere Classified)": "8099",
+                "Child Care Services": "8351"
+            },
+        },
+        home: {
+            pattern: /ремонт/i,
+            category: {
+                "Horticultural Services, Landscaping Services": "0780",
+                "General Contractors-Residential and Commercial": "1520",
+                "Air Conditioning Contractors – Sales and Installation, Heating Contractors – Sales, Service, Installation": "1711",
+                "Electrical Contractors": "1731",
+                "Insulation – Contractors, Masonry, Stonework Contractors, Plastering Contractors, Stonework and Masonry Contractors, Tile Settings Contractors": "1740",
+                "Carpentry Contractors": "1750",
+                "Roofing – Contractors, Sheet Metal Work – Contractors, Siding – Contractors": "1761",
+                "Contractors – Concrete Work": "1771",
+                "Contractors – Special Trade, Not Elsewhere Classified": "1799",
+                "Typesetting, Plate Making, & Related Services": "2791",
+                "Specialty Cleaning, Polishing, and Sanitation Preparations": "2842",
+                "Office and Commercial Furniture": "5021",
+                "Construction Materials, Not Elsewhere Classified": "5039",
+                "Computers, Computer Peripheral Equipment, Software": "5045",
+                "Commercial Equipment, Not Elsewhere Classified": "5046",
+                "Metal Service Centers and Offices": "5051",
+                "Electrical Parts and Equipment": "5065",
+                "Hardware Equipment and Supplies": "5072",
+                "Plumbing and Heating Equipment and Supplies": "5074",
+                "Industrial Supplies, Not Elsewhere Classified": "5085",
+                "Paints, Varnishes, and Supplies": "5198",
+                "Home Supply Warehouse Stores": "5200",
+                "Lumber and Building Materials Stores": "5211",
+                "Glass, Paint, and Wallpaper Stores": "5231",
+                "Hardware Stores": "5251",
+                "Nurseries – Lawn and Garden Supply Store": "5261",
+                "Department Stores": "5311",
+                "Furniture, Home Furnishings, and Equipment Stores, ExceptAppliances": "5712",
+                "Floor Covering Stores": "5713",
+                "Drapery, Window Covering and Upholstery Stores": "5714",
+                "Fireplace, Fireplace Screens, and Accessories Stores": "5718",
+                "Miscellaneous Home Furnishing Specialty Stores": "5719",
+                "Household Appliance Stores": "5722",
+                "Electronic Sales": "5732",
+                "Music Stores, Musical Instruments, Piano Sheet Music": "5733",
+                "Record Shops": "5735",
+                "Camera and Photographic Supply Stores": "5946",
+                "Computer Maintenance and Repair Services, Not Elsewhere Classified": "7379",
+                "Radio Repair Shops": "7622",
+                "Air Conditioning and Refrigeration Repair Shops": "7623",
+                "Electrical And Small Appliance Repair Shops": "7629",
+                "Furniture, Furniture Repair, and Furniture Refinishing": "7641",
+                "Welding Repair": "7692",
+                "Repair Shops and Related Services –Miscellaneous": "7699"
+            },
+        },
+        auto: {
+            pattern: /авто/i,
+            category: {
+                "Motor vehicle supplies and new parts": "5013",
+                "Petroleum and Petroleum Products": "5172",
+                "Car and Truck Dealers (New and Used) Sales, Service, Repairs, Parts, and Leasing": "5511",
+                "Automobile and Truck Dealers (Used Only)": "5521",
+                "Automobile Supply Stores": "5531",
+                "Automotive Tire Stores": "5532",
+                "Automotive Parts, Accessories Stores": "5533",
+                "Service Stations ( with or without ancillary services)": "5541",
+                "Automated Fuel Dispensers": "5542",
+                "Recreational and Utility Trailers, Camp Dealers": "5561",
+                "Motorcycle Dealers": "5571",
+                "Motor Home Dealers": "5592",
+                "Snowmobile Dealers": "5598",
+                "Miscellaneous Auto Dealers ": "5599",
+                "Fuel – Fuel Oil, Wood, Coal, Liquefied Petroleum": "5983",
+                "Automobile Parking Lots and Garages": "7523",
+                "Automotive Body Repair Shops": "7531",
+                "Tire Re-treading and Repair Shops": "7534",
+                "Paint Shops – Automotive": "7535",
+                "Automotive Service Shops": "7538",
+                "Car Washes": "7542",
+                "Towing Services": "7549",
+                "Automobile Associations": "8675"
+            },
+        },
+        travel: {
+            pattern: /путешествия/i,
+            category: {
+                "UNITED AIRLINES": "3000",
+                "AMERICAN AIRLINES": "3001",
+                "PAN AMERICAN": "3002",
+                "Airlines": [
+                    "3003",
+                    "3019",
+                    "3026",
+                    "3059",
+                    "3064",
+                    "3067",
+                    "3068",
+                    "3072",
+                    "3079",
+                    "3086",
+                    "3090",
+                    "3092",
+                    "3095",
+                    "3097",
+                    "3098",
+                    "3115",
+                    "3131",
+                    "3132",
+                    "3136",
+                    "3148",
+                    "3156",
+                    "3167",
+                    "3174",
+                    "3175",
+                    "3177",
+                    "3180",
+                    "3183",
+                    "3188",
+                    "3206",
+                    "3211",
+                    "3213",
+                    "3226",
+                    "3236",
+                    "3245",
+                    "3246",
+                    "3247",
+                    "3248",
+                    "3260",
+                    "3263",
+                    "3296",
+                    "3297"
+                ],
+                "TRANS WORLD AIRLINES": "3004",
+                "BRITISH AIRWAYS": "3005",
+                "JAPAN AIRLINES": "3006",
+                "AIR FRANCE": "3007",
+                "LUFTHANSA": "3008",
+                "AIR CANADA": "3009",
+                "KLM (ROYAL DUTCH AIRLINES)": "3010",
+                "AEORFLOT": "3011",
+                "QUANTAS": "3012",
+                "ALITALIA": "3013",
+                "SAUDIA ARABIAN AIRLINES": "3014",
+                "SWISSAIR": "3015",
+                "SAS": "3016",
+                "SOUTH AFRICAN AIRWAYS": "3017",
+                "VARIG (BRAZIL)": "3018",
+                "AIR-INDIA": "3020",
+                "AIR ALGERIE": "3021",
+                "PHILIPPINE AIRLINES": "3022",
+                "MEXICANA": "3023",
+                "PAKISTAN INTERNATIONAL": "3024",
+                "AIR NEW ZEALAND": "3025",
+                "UTA/INTERAIR": "3027",
+                "AIR MALTA": "3028",
+                "SABENA": "3029",
+                "AEROLINEAS ARGENTINAS": "3030",
+                "OLYMPIC AIRWAYS": "3031",
+                "EL AL": "3032",
+                "ANSETT AIRLINES": "3033",
+                "AUSTRAINLIAN AIRLINES": "3034",
+                "TAP (PORTUGAL)": "3035",
+                "VASP (BRAZIL)": "3036",
+                "EGYPTAIR": "3037",
+                "KUWAIT AIRLINES": "3038",
+                "AVIANCA": "3039",
+                "GULF AIR (BAHRAIN)": "3040",
+                "BALKAN-BULGARIAN AIRLINES": "3041",
+                "FINNAIR": "3042",
+                "AER LINGUS": "3043",
+                "AIR LANKA": "3044",
+                "NIGERIA AIRWAYS": "3045",
+                "CRUZEIRO DO SUL (BRAZIJ)": "3046",
+                "THY (TURKEY)": "3047",
+                "ROYAL AIR MAROC": "3048",
+                "TUNIS AIR": "3049",
+                "ICELANDAIR": "3050",
+                "AUSTRIAN AIRLINES": "3051",
+                "LANCHILE": "3052",
+                "AVIACO (SPAIN)": "3053",
+                "LADECO (CHILE)": "3054",
+                "LAB (BOLIVIA)": "3055",
+                "QUEBECAIRE": "3056",
+                "EASTWEST AIRLINES (AUSTRALIA)": "3057",
+                "DELTA": "3058",
+                "NORTHWEST": "3060",
+                "CONTINENTAL": "3061",
+                "WESTERN": "3062",
+                "US AIR": "3063",
+                "AIRINTER": "3065",
+                "SOUTHWEST": "3066",
+                "SUN COUNTRY AIRLINES": "3069",
+                "AIR BRITISH COLUBIA": "3071",
+                "SINGAPORE AIRLINES": "3075",
+                "AEROMEXICO": "3076",
+                "THAI AIRWAYS": "3077",
+                "CHINA AIRLINES": "3078",
+                "NORDAIR": "3081",
+                "KOREAN AIRLINES": "3082",
+                "AIR AFRIGUE": "3083",
+                "EVA AIRLINES": "3084",
+                "MIDWEST EXPRESS AIRLINES, INC.": "3085",
+                "METRO AIRLINES": "3087",
+                "CROATIA AIRLINES": "3088",
+                "TRANSAERO": "3089",
+                "ZAMBIA AIRWAYS": "3094",
+                "AIR ZIMBABWE": "3096",
+                "CATHAY PACIFIC": "3099",
+                "MALAYSIAN AIRLINE SYSTEM": "3100",
+                "IBERIA": "3102",
+                "GARUDA (INDONESIA)": "3103",
+                "BRAATHENS S.A.F.E. (NORWAY)": "3106",
+                "WINGS AIRWAYS": "3110",
+                "BRITISH MIDLAND": "3111",
+                "WINDWARD ISLAND": "3112",
+                "VIASA": "3117",
+                "VALLEY AIRLINES": "3118",
+                "TAN": "3125",
+                "TALAIR": "3126",
+                "TACA INTERNATIONAL": "3127",
+                "SURINAM AIRWAYS": "3129",
+                "SUN WORLD INTERNATIONAL": "3130",
+                "SUNBELT AIRLINES": "3133",
+                "SUDAN AIRWAYS": "3135",
+                "SINGLETON": "3137",
+                "SIMMONS AIRLINES": "3138",
+                "SCENIC AIRLINES": "3143",
+                "VIRGIN ATLANTIC": "3144",
+                "SAN JUAN AIRLINES": "3145",
+                "LUXAIR": "3146",
+                "AIR ZAIRE": "3151",
+                "PRINCEVILLE": "3154",
+                "PBA": "3159",
+                "ALL NIPPON AIRWAYS": "3161",
+                "NORONTAIR": "3164",
+                "NEW YORK HELICOPTER": "3165",
+                "NOUNT COOK": "3170",
+                "CANADIAN AIRLINES INTERNATIONAL": "3171",
+                "NATIONAIR": "3172",
+                "METROFLIGHT AIRLINES": "3176",
+                "MESA AIR": "3178",
+                "MALEV": "3181",
+                "LOT (POLAND)": "3182",
+                "LIAT": "3184",
+                "LAV (VENEZUELA)": "3185",
+                "LAP (PARAGUAY)": "3186",
+                "LACSA (COSTA RICA)": "3187",
+                "JUGOSLAV AIR": "3190",
+                "ISLAND AIRLINES": "3191",
+                "IRAN AIR": "3192",
+                "INDIAN AIRLINES": "3193",
+                "HAWAIIAN AIR": "3196",
+                "HAVASU AIRLINES": "3197",
+                "FUYANA AIRWAYS": "3200",
+                "GOLDEN PACIFIC AIR": "3203",
+                "FREEDOM AIR": "3204",
+                "DOMINICANA": "3212",
+                "DAN AIR SERVICES": "3215",
+                "CUMBERLAND AIRLINES": "3216",
+                "CSA": "3217",
+                "CROWN AIR": "3218",
+                "COPA": "3219",
+                "COMPANIA FAUCETT": "3220",
+                "TRANSPORTES AEROS MILITARES ECCUATORANOS": "3221",
+                "COMMAND AIRWAYS": "3222",
+                "COMAIR": "3223",
+                "CAYMAN AIRWAYS": "3228",
+                "SAETA SOCIAEDAD ECUATORIANOS DE TRANSPORTES AEREOS": "3229",
+                "SASHA SERVICIO AERO DE HONDURAS": "3231",
+                "CAPITOL AIR": "3233",
+                "BWIA": "3234",
+                "BROKWAY AIR": "3235",
+                "BEMIDJI AIRLINES": "3238",
+                "BAR HARBOR AIRLINES": "3239",
+                "BAHAMASAIR": "3240",
+                "AVIATECA (GUATEMALA)": "3241",
+                "AVENSA": "3242",
+                "AUSTRIAN AIR SERVICE": "3243",
+                "ALOHA AIRLINES": "3251",
+                "ALM": "3252",
+                "AMERICA WEST": "3253",
+                "TRUMP AIRLINE": "3254",
+                "ALASKA AIRLINES": "3256",
+                "AMERICAN TRANS AIR": "3259",
+                "AIR CHINA": "3261",
+                "RENO AIR, INC.": "3262",
+                "AIR SEYCHELLES": "3266",
+                "AIR PANAMA": "3267",
+                "AIR JAMAICA": "3280",
+                "AIR DJIBOUTI": "3282",
+                "AERO VIRGIN ISLANDS": "3284",
+                "AERO PERU": "3285",
+                "AEROLINEAS NICARAGUENSIS": "3286",
+                "AERO COACH AVAIATION": "3287",
+                "CYPRUS AIRWAYS": "3292",
+                "ECUATORIANA": "3293",
+                "ETHIOPIAN AIRLINES": "3294",
+                "KENYA AIRLINES": "3295",
+                "AIR MAURITIUS": "3298",
+                "WIDERO’S FLYVESELSKAP": "3299",
+                "AFFILIATED AUTO RENTAL": "3351",
+                "AMERICAN INTL RENT-A-CAR": "3352",
+                "BROOKS RENT-A-CAR": "3353",
+                "ACTION AUTO RENTAL": "3354",
+                "Car Rental": [
+                    "3355",
+                    "3374",
+                    "3380",
+                    "3388",
+                    "3441"
+                ],
+                "HERTZ RENT-A-CAR": "3357",
+                "PAYLESS CAR RENTAL": "3359",
+                "SNAPPY CAR RENTAL": "3360",
+                "AIRWAYS RENT-A-CAR": "3361",
+                "ALTRA AUTO RENTAL": "3362",
+                "AGENCY RENT-A-CAR": "3364",
+                "BUDGET RENT-A-CAR": "3366",
+                "HOLIDAY RENT-A-WRECK": "3368",
+                "RENT-A-WRECK": "3370",
+                "AJAX RENT-A-CAR": "3376",
+                "EUROP CAR": "3381",
+                "TROPICAL RENT-A-CAR": "3385",
+                "SHOWCASE RENTAL CARS": "3386",
+                "ALAMO RENT-A-CAR": "3387",
+                "AVIS RENT-A-CAR": "3389",
+                "DOLLAR RENT-A-CAR": "3390",
+                "EUROPE BY CAR": "3391",
+                "NATIONAL CAR RENTAL": "3393",
+                "KEMWELL GROUP RENT-A-CAR": "3394",
+                "THRIFTY RENT-A-CAR": "3395",
+                "TILDEN TENT-A-CAR": "3396",
+                "ECONO-CAR RENT-A-CAR": "3398",
+                "AUTO HOST COST CAR RENTALS": "3400",
+                "ENTERPRISE RENT-A-CAR": "3405",
+                "GENERAL RENT-A-CAR": "3409",
+                "A-1 RENT-A-CAR": "3412",
+                "GODFREY NATL RENT-A-CAR": "3414",
+                "ANSA INTL RENT-A-CAR": "3420",
+                "ALLSTAE RENT-A-CAR": "3421",
+                "AVCAR RENT-A-CAR": "3423",
+                "AUTOMATE RENT-A-CAR": "3425",
+                "AVON RENT-A-CAR": "3427",
+                "CAREY RENT-A-CAR": "3428",
+                "INSURANCE RENT-A-CAR": "3429",
+                "MAJOR RENT-A-CAR": "3430",
+                "REPLACEMENT RENT-A-CAR": "3431",
+                "RESERVE RENT-A-CAR": "3432",
+                "UGLY DUCKLING RENT-A-CAR": "3433",
+                "USA RENT-A-CAR": "3434",
+                "VALUE RENT-A-CAR": "3435",
+                "AUTOHANSA RENT-A-CAR": "3436",
+                "CITE RENT-A-CAR": "3437",
+                "INTERENT RENT-A-CAR": "3438",
+                "MILLEVILLE RENT-A-CAR": "3439",
+                "HOLIDAY INNS, HOLIDAY INN EXPRESS": "3501",
+                "BEST WESTERN HOTELS": "3502",
+                "SHERATON HOTELS": "3503",
+                "HILTON HOTELS": "3504",
+                "FORTE HOTELS": "3505",
+                "GOLDEN TULIP HOTELS": "3506",
+                "FRIENDSHIP INNS": "3507",
+                "QUALITY INNS, QUALITY SUITES": "3508",
+                "MARRIOTT HOTELS": "3509",
+                "DAYS INN, DAYSTOP": "3510",
+                "ARABELLA HOTELS": "3511",
+                "INTER-CONTINENTAL HOTELS": "3512",
+                "WESTIN HOTELS": "3513",
+                "Hotels/Motels/Inns/Resorts": [
+                    "3514",
+                    "3526",
+                    "3539",
+                    "3546",
+                    "3547",
+                    "3551",
+                    "3554",
+                    "3555",
+                    "3556",
+                    "3557",
+                    "3559",
+                    "3560",
+                    "3561",
+                    "3564",
+                    "3566",
+                    "3567",
+                    "3569",
+                    "3571",
+                    "3576",
+                    "3578",
+                    "3580",
+                    "3582",
+                    "3589",
+                    "3594",
+                    "3596",
+                    "3597",
+                    "3600",
+                    "3601",
+                    "3602",
+                    "3604",
+                    "3605",
+                    "3606",
+                    "3607",
+                    "3608",
+                    "3609",
+                    "3610",
+                    "3611",
+                    "3613",
+                    "3614",
+                    "3616",
+                    "3617",
+                    "3618",
+                    "3619",
+                    "3621",
+                    "3624",
+                    "3627",
+                    "3628",
+                    "3630",
+                    "3631",
+                    "3632",
+                    "3662",
+                    "3667",
+                    "3669",
+                    "3676",
+                    "3680",
+                    "3683",
+                    "3708",
+                    "3735",
+                    "3757",
+                    "3758",
+                    "3759",
+                    "3760",
+                    "3761",
+                    "3762",
+                    "3763",
+                    "3764",
+                    "3765",
+                    "3766",
+                    "3767",
+                    "3768",
+                    "3769",
+                    "3770",
+                    "3771",
+                    "3772",
+                    "3773",
+                    "3774",
+                    "3775",
+                    "3776",
+                    "3777",
+                    "3778",
+                    "3779",
+                    "3780",
+                    "3781",
+                    "3782",
+                    "3783",
+                    "3784",
+                    "3785",
+                    "3786",
+                    "3787",
+                    "3788",
+                    "3789",
+                    "3790"
+                ],
+                "RODEWAY INNS": "3515",
+                "LA QUINTA MOTOR INNS": "3516",
+                "AMERICANA HOTELS": "3517",
+                "SOL HOTELS": "3518",
+                "PULLMAN INTERNATIONAL HOTELS": "3519",
+                "MERIDIEN HOTELS": "3520",
+                "CREST HOTELS (see FORTE HOTELS)": "3521",
+                "TOKYO HOTEL": "3522",
+                "PENNSULA HOTEL": "3523",
+                "WELCOMGROUP HOTELS": "3524",
+                "DUNFEY HOTELS": "3525",
+                "DOWNTOWNER-PASSPORT HOTEL": "3527",
+                "RED LION HOTELS, RED LION INNS": "3528",
+                "CP HOTELS": "3529",
+                "RENAISSANCE HOTELS, STOUFFER HOTELS": "3530",
+                "ASTIR HOTELS": "3531",
+                "SUN ROUTE HOTELS": "3532",
+                "HOTEL IBIS": "3533",
+                "SOUTHERN PACIFIC HOTELS": "3534",
+                "HILTON INTERNATIONAL": "3535",
+                "AMFAC HOTELS": "3536",
+                "ANA HOTEL": "3537",
+                "CONCORDE HOTELS": "3538",
+                "IBEROTEL HOTELS": "3540",
+                "HOTEL OKURA": "3541",
+                "ROYAL HOTELS": "3542",
+                "FOUR SEASONS HOTELS": "3543",
+                "CIGA HOTELS": "3544",
+                "SHANGRI-LA INTERNATIONAL": "3545",
+                "HOTELES MELIA": "3548",
+                "AUBERGE DES GOVERNEURS": "3549",
+                "REGAL 8 INNS": "3550",
+                "COAST HOTELS": "3552",
+                "PARK INNS INTERNATIONAL": "3553",
+                "JOLLY HOTELS": "3558",
+                "COMFORT INNS": "3562",
+                "JOURNEY’S END MOTLS": "3563",
+                "RELAX INNS": "3565",
+                "LADBROKE HOTELS": "3568",
+                "FORUM HOTELS": "3570",
+                "MIYAKO HOTELS": "3572",
+                "SANDMAN HOTELS": "3573",
+                "VENTURE INNS": "3574",
+                "VAGABOND HOTELS": "3575",
+                "MANDARIN ORIENTAL HOTEL": "3577",
+                "HOTEL MERCURE": "3579",
+                "DELTA HOTEL": "3581",
+                "SAS HOTELS": "3583",
+                "PRINCESS HOTELS INTERNATIONAL": "3584",
+                "HUNGAR HOTELS": "3585",
+                "SOKOS HOTELS": "3586",
+                "DORAL HOTELS": "3587",
+                "HELMSLEY HOTELS": "3588",
+                "FAIRMONT HOTELS": "3590",
+                "SONESTA HOTELS": "3591",
+                "OMNI HOTELS": "3592",
+                "CUNARD HOTELS": "3593",
+                "HOSPITALITY INTERNATIONAL": "3595",
+                "REGENT INTERNATIONAL HOTELS": "3598",
+                "PANNONIA HOTELS": "3599",
+                "NOAH’S HOTELS": "3603",
+                "MOVENPICK HOTELS": "3612",
+                "TRAVELODGE": "3615",
+                "TELFORD INTERNATIONAL": "3620",
+                "MERLIN HOTELS": "3622",
+                "DORINT HOTELS": "3623",
+                "HOTLE UNIVERSALE": "3625",
+                "PRINCE HOTELS": "3626",
+                "DAN HOTELS": "3629",
+                "RANK HOTELS": "3633",
+                "SWISSOTEL": "3634",
+                "RESO HOTELS": "3635",
+                "SAROVA HOTELS": "3636",
+                "RAMADA INNS, RAMADA LIMITED": "3637",
+                "HO JO INN, HOWARD JOHNSON": "3638",
+                "MOUNT CHARLOTTE THISTLE": "3639",
+                "HYATT HOTEL": "3640",
+                "SOFITEL HOTELS": "3641",
+                "NOVOTEL HOTELS": "3642",
+                "STEIGENBERGER HOTELS": "3643",
+                "ECONO LODGES": "3644",
+                "QUEENS MOAT HOUSES": "3645",
+                "SWALLOW HOTELS": "3646",
+                "HUSA HOTELS": "3647",
+                "DE VERE HOTELS": "3648",
+                "RADISSON HOTELS": "3649",
+                "RED ROOK INNS": "3650",
+                "IMPERIAL LONDON HOTEL": "3651",
+                "EMBASSY HOTELS": "3652",
+                "PENTA HOTELS": "3653",
+                "LOEWS HOTELS": "3654",
+                "SCANDIC HOTELS": "3655",
+                "SARA HOTELS": "3656",
+                "OBEROI HOTELS": "3657",
+                "OTANI HOTELS": "3658",
+                "TAJ HOTELS INTERNATIONAL": "3659",
+                "KNIGHTS INNS": "3660",
+                "METROPOLE HOTELS": "3661",
+                "HOTELES EL PRESIDENTS": "3663",
+                "FLAG INN": "3664",
+                "HAMPTON INNS": "3665",
+                "STAKIS HOTELS": "3666",
+                "MARITIM HOTELS": "3668",
+                "ARCARD HOTELS": "3670",
+                "ARCTIA HOTELS": "3671",
+                "CAMPANIEL HOTELS": "3672",
+                "IBUSZ HOTELS": "3673",
+                "RANTASIPI HOTELS": "3674",
+                "INTERHOTEL CEDOK": "3675",
+                "CLIMAT DE FRANCE HOTELS": "3677",
+                "CUMULUS HOTELS": "3678",
+                "DANUBIUS HOTEL": "3679",
+                "ADAMS MARK HOTELS": "3681",
+                "ALLSTAR INNS": "3682",
+                "BUDGET HOST INNS": "3684",
+                "BUDGETEL HOTELS": "3685",
+                "SUISSE CHALETS": "3686",
+                "CLARION HOTELS": "3687",
+                "COMPRI HOTELS": "3688",
+                "CONSORT HOTELS": "3689",
+                "COURTYARD BY MARRIOTT": "3690",
+                "DILLION INNS": "3691",
+                "DOUBLETREE HOTELS": "3692",
+                "DRURY INNS": "3693",
+                "ECONOMY INNS OF AMERICA": "3694",
+                "EMBASSY SUITES": "3695",
+                "EXEL INNS": "3696",
+                "FARFIELD HOTELS": "3697",
+                "HARLEY HOTELS": "3698",
+                "MIDWAY MOTOR LODGE": "3699",
+                "MOTEL 6": "3700",
+                "GUEST QUARTERS (Formally PICKETT SUITE HOTELS)": "3701",
+                "THE REGISTRY HOTELS": "3702",
+                "RESIDENCE INNS": "3703",
+                "ROYCE HOTELS": "3704",
+                "SANDMAN INNS": "3705",
+                "SHILO INNS": "3706",
+                "SHONEY’S INNS": "3707",
+                "SUPER8 MOTELS": "3709",
+                "THE RITZ CARLTON HOTELS": "3710",
+                "FLAG INNS (AUSRALIA)": "3711",
+                "GOLDEN CHAIN HOTEL": "3712",
+                "QUALITY PACIFIC HOTEL": "3713",
+                "FOUR SEASONS HOTEL (AUSTRALIA)": "3714",
+                "FARIFIELD INN": "3715",
+                "CARLTON HOTELS": "3716",
+                "CITY LODGE HOTELS": "3717",
+                "KAROS HOTELS": "3718",
+                "PROTEA HOTELS": "3719",
+                "SOUTHERN SUN HOTELS": "3720",
+                "HILTON CONRAD": "3721",
+                "WYNDHAM HOTEL AND RESORTS": "3722",
+                "RICA HOTELS": "3723",
+                "INER NOR HOTELS": "3724",
+                "SEAINES PLANATION": "3725",
+                "RIO SUITES": "3726",
+                "BROADMOOR HOTEL": "3727",
+                "BALLY’S HOTEL AND CASINO": "3728",
+                "JOHN ASCUAGA’S NUGGET": "3729",
+                "MGM GRAND HOTEL": "3730",
+                "HARRAH’S HOTELS AND CASINOS": "3731",
+                "OPRYLAND HOTEL": "3732",
+                "BOCA RATON RESORT": "3733",
+                "HARVEY/BRISTOL HOTELS": "3734",
+                "COLORADO BELLE/EDGEWATER RESORT": "3736",
+                "RIVIERA HOTEL AND CASINO": "3737",
+                "TROPICANA RESORT AND CASINO": "3738",
+                "WOODSIDE HOTELS AND RESORTS": "3739",
+                "TOWNPLACE SUITES": "3740",
+                "MILLENIUM BROADWAY HOTEL": "3741",
+                "CLUB MED": "3742",
+                "BILTMORE HOTEL AND SUITES": "3743",
+                "CAREFREE RESORTS": "3744",
+                "ST. REGIS HOTEL": "3745",
+                "THE ELIOT HOTEL": "3746",
+                "CLUBCORP/CLUB RESORTS": "3747",
+                "WELESLEY INNS": "3748",
+                "THE BEVERLY HILLS HOTEL": "3749",
+                "CROWNE PLAZA HOTELS": "3750",
+                "HOMEWOOD SUITES": "3751",
+                "PEABODY HOTELS": "3752",
+                "GREENBRIAH RESORTS": "3753",
+                "AMELIA ISLAND PLANATION": "3754",
+                "THE HOMESTEAD": "3755",
+                "SOUTH SEAS RESORTS": "3756",
+                "Home2Suites": "3816",
+                "Railroads": "4011",
+                "Local/Suburban Commuter Passenger Transportation – Railroads, Feries, Local Water Transportation.": "4111",
+                "Passenger Railways": "4112",
+                "Taxicabs and Limousines": "4121",
+                "Bus Lines, Including Charters, Tour Buses": "4131",
+                "Cruise and Steamship Lines": "4411",
+                "Marinas, Marine Service, and Supplies": "4468",
+                "Airlines, Air Carriers ( not listed elsewhere)": "4511",
+                "Airports, Airport Terminals, Flying Fields": "4582",
+                "Travel Agencies and Tour Operations": "4722",
+                "Package Tour Operators (For use in Germany only)": "4723",
+                "Toll and Bridge Fees": "4784",
+                "Transportation Services, Not elsewhere classified)": "4789",
+                "Duty Free Store": "5309",
+                "Lodging – Hotels, Motels, Resorts, Central Reservation Services (not elsewhere classified)": "7011",
+                "Car Rental Companies ( Not Listed Below)": "7512",
+                "Truck and Utility Trailer Rentals": "7513",
+                "Motor Home and Recreational Vehicle Rentals": "7519"
+            },
+        },
+        shopping: {
+            pattern: /шопинг/i,
+            category: {
+                "Men’s Women’s and Children’s Uniforms and Commercial Clothing": "5137",
+                "Commercial Footwear": "5139",
+                "Men’s and Boy’s Clothing and Accessories Stores": "5611",
+                "Women’s Ready-to-Wear Stores": "5621",
+                "Women’s Accessory and Specialty Shops": "5631",
+                "Family Clothing Stores": "5651",
+                "Sports Apparel, Riding Apparel Stores": "5655",
+                "Shoe Stores": "5661",
+                "Furriers and Fur Shops": "5681",
+                "Men’s and Women’s Clothing Stores": "5691",
+                "Tailors, Seamstress, Mending, and Alterations": "5697",
+                "Wig and Toupee Stores": "5698",
+                "Miscellaneous Apparel and Accessory Shops": "5699",
+                "Used Merchandise and Secondhand Stores": "5931",
+                "Leather Foods Stores": "5948",
+                "Sewing, Needle, Fabric, and Price Goods Stores": "5949",
+                "Cosmetic Stores": "5977",
+                "Barber and Beauty Shops": "7230",
+                "Shop Repair Shops and Shoe Shine Parlors, and Hat Cleaning Shops": "7251",
+                "Clothing Rental – Costumes, Formal Wear, Uniforms": "7296",
+                "Massage Parlors": "7297",
+                "Health and Beauty Shops": "7298",
+                "Commercial Sports, Athletic Fields, Professional Sport Clubs, and Sport Promoters": "7941",
+                "Golf Courses – Public": "7992",
+                "Membership Clubs (Sports, Recreation, Athletic), Country Clubs, and Private Golf Courses": "7997"
+            },
+        },
+        relax: {
+            pattern: /развлечения/i,
+            category: {
+                "Bakeries": "5462",
+                "Caterers": "5811",
+                "Eating places and Restaurants": "5812",
+                "Drinking Places (Alcoholic Beverages), Bars, Taverns, Cocktail lounges, Nightclubs and Discotheques": "5813",
+                "Fast Food Restaurants": "5814",
+                "Motion Pictures and Video Tape Production and Distribution": "7829",
+                "Motion Picture Theaters": "7832",
+                "Video Tape Rental Stores": "7841",
+                "Dance Halls, Studios and Schools": "7911",
+                "Theatrical Producers (Except Motion Pictures), Ticket Agencies": "7922",
+                "Bands, Orchestras, and Miscellaneous Entertainers (Not Elsewhere Classified)": "7929",
+                "Billiard and Pool Establishments": "7932",
+                "Bowling Alleys": "7933",
+                "Tourist Attractions and Exhibits": "7991",
+                "Video Amusement Game Supplies": "7993",
+                "Video Game Arcades/Establishments": "7994",
+                "Amusement Parks, Carnivals, Circuses, Fortune Tellers": "7996",
+                "Aquariums, Sea-aquariums, Dolphinariums": "7998",
+                "Recreation Services (Not Elsewhere Classified)": "7999"
+            }
+        },
+    };
+
+    function processList() {
+        var cardName = $("#chooseSource option:selected").text();
+        if (!cardName) return;
+        var matches = cardName.match(/\*{4}\s+(\d+)/);
+        if (matches && matches.length == 2) {
+            var last4Digit = matches[1];
+            if (!last4Digit) return; //Cant detect card number;
+            var sCardCategory = getCardCategory(last4Digit);
+            if (!sCardCategory) {
+                for (var prop in CardTypes) {
+                    var oType = CardTypes[prop];
+                    if (oType.exclude) continue;
+                    if (cardName.match(oType.pattern)) {
+                        sCardCategory = prop;
+                        setCardCategory(last4Digit, sCardCategory);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function _createGetCategoryCallBack(sUrl) {
+            var sUrlLocal = sUrl;
+            return function() {
+                return window.fetch(sUrlLocal)
+                    .then(oResponse => oResponse.text())
+                    .then(sHtml => {
+                        var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
+                        if (matches && matches.length == 2) {
+                            return matches[1].trim();
+                        }
+                        return null;
+                    });
+            };
+        }
+        var oCashBackPerMonth = {};
+        var aOperAsync = [];
+        $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
+            var oTr = $(tr);
+            var oTdCredit = oTr.find("#redCredit");
+            var sCost = oTdCredit.text().trim().replace(/\s+/g, "");
+            if (sCost) {
+                var aTd = oTr.find("td");
+                var sPlace = aTd[2].innerText.trim();
+                if (sPlace.match(/OTPdirekt/i)) return;
+                var sDate = aTd[1].innerText;
+                var sUrl = $(aTd[7]).find("a").attr("href");
+                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, _createGetCategoryCallBack(sUrl))
+                    .then(sOperation => {
+                        var aData = sOperation.split(":");
+                        aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
+                        var iPercent = aData[1] - 0;
+                        var fCB = 0.0;
+                        var fCost = Math.abs(parseFloat(sCost));
+                        if (fCost < 100) {
+                            iPercent = 0;
+                        } else {
+                            fCB = Math.round(fCost * iPercent) / 100 + 0.0;
+                            var aDate = sDate.split("/");
+                            var sMonth = aDate[1];
+                            if (fCB > 0) {
+                                if (!oCashBackPerMonth[sMonth]) {
+                                    oCashBackPerMonth[sMonth] = 0;
+                                    oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
+                                }
+                                oCashBackPerMonth[sMonth] += fCB;
+                            }
+                        }
+
+                        aTd[3].innerHTML = '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
+                    }, err => true));
+            }
+        });
+
+        Promise.all(aOperAsync)
+            .then(_ => {
+                if (oCashBackPerMonth.length) {
+                    delete oCashBackPerMonth.length;
+                    var oDivDetail = $("#details");
+                    var oDivCB = $('<div id="details"></div>');
+                    oDivCB.append($('<div class="highlighted financialInfo"><h2 class="tableName">Планируемый CashBack</h2></div>'));
+                    var oCBTable = $('<table id="cb_per_month" class="eredmenytabla"><thead><tr class="odd"><th>Месяц</th><th>Сумма</th></tr></thead></table>');
+                    var oCBTableBody = $('<tbody></tbody>');
+                    var iRow = 0;
+                    for (var sMonth in oCashBackPerMonth) {
+                        var fSumm = Math.min(3000, Math.round(oCashBackPerMonth[sMonth] * 100) / 100);
+                        var sClass = iRow++ % 2 == 0 ? "paros" : "paratlan odd";
+                        oCBTableBody.append($('<tr class="' + sClass + '"><td>' + sMonth + '</td><td nowrap="nowrap" id="greenDebit">' + fSumm + '</td></tr>'));
+                    }
+                    oCBTable.append(oCBTableBody);
+                    oDivCB.append(oCBTable);
+                    oDivDetail.parent().append(oDivCB);
+                }
+            });
+    }
+
+    function processDetail() {
+        var last4Digit = "";
+        var otpCat = "";
+        var oTdCost = null;
+        var oTdCat = null;
+        var sDate = null;
+        var sCity = null;
+        var sTSP = null;
+        $("#details > table.allapot_informacio_keskeny > tbody > tr").each(function(index, tr) {
+            var oTr = $(tr);
+            var label = oTr.find("th").text().trim();
+            if (!last4Digit && label.match(/Номер\s+карты/i)) {
+                var value = oTr.find("td").text().trim();
+                var matches = value.match(/\*{4}\s+(\d+)/);
+                if (matches.length == 2) {
+                    last4Digit = matches[1];
+                }
+            }
+            if (!otpCat && label.match(/Категория\s+торговой\s+точки/i)) {
+                oTdCat = oTr.find("td");
+                otpCat = oTdCat.text().trim();
+            }
+            if (!oTdCost && label.match(/Сумма\s+в\s+валюте\s+счета/i)) {
+                oTdCost = oTr.find("td");
+            }
+            if (!sDate && label.match(/Дата\s+и\s+время\s+операции/i)) {
+                sDate = oTr.find("td").text().trim();
+                sDate = sDate.split(" ")[0].replace(/\./g, "/");
+            }
+            if (!sCity && label.match(/Город\s+торговой\s+точки/i)) {
+                sCity = oTr.find("td").text().trim();
+            }
+            if (!sTSP && label.match(/Место/i)) {
+                sTSP = oTr.find("td").text().trim();
+            }
+
+            if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP) return false;
+        });
+
+        if (!sTSP || sTSP.match(/OTPdirekt/i) || !sCity || !otpCat) return;
+
+        getOperationAsync(last4Digit, sDate, sTSP + " - " + sCity, function() {
+            return Promise.resolve(otpCat);
+        }).then(sOperation => {
+            var aData = sOperation.split(":");
+            var sMCC = aData[0];
+            var iPercent = aData[1] - 0;
+            if (oTdCat && sMCC) {
+                oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
+            }
+
+            if (oTdCost) {
+                var sCost = oTdCost.text().trim();
+                var fCB = 0.00;
+                var fCost = parseFloat(sCost.replace(/\s+/g, ""));
+                if (fCost >= 100) {
+                    fCB = Math.round(fCost * iPercent) / 100 + 0.00;
+                } else {
+                    iPercent = 0;
+                }
+                oTdCost.html(sCost + '&nbsp<span class="cb' + iPercent + '">(CashBack:&nbsp' + fCB + ")</span>");
+            }
+        });
+    }
+
+    log("OTP MCC Codes");
+    $(document).ready(function() {
+        log("Doc Ready");
+        if (window.location.pathname.match("szamlatortenet")) {
+            //Выписка
+            processList();
+        } else if (window.location.pathname.match("kartyaTranzakcioReszletek")) {
+            //Operation detail
+            processDetail();
+        }
+    });
+})($);
