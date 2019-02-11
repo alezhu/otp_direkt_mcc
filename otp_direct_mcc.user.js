@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -31,290 +31,6 @@ color:blue;
     'use strict';
     var LOG = 1;
     var PREFIX = "AZ";
-
-    function log(data) {
-        if (LOG) console.log(data);
-    }
-
-    function getCardCategory(last4Digit) {
-        return localStorage[PREFIX + ".card" + last4Digit];
-    }
-
-    function setCardCategory(last4Digit, sCategory) {
-        localStorage[PREFIX + ".card" + last4Digit] = sCategory;
-    }
-
-    function getMCC4Category(oType, sMC) {
-        if (!sMC) return null;
-        var result = oType.category[sMC];
-        if (!result) {
-            var sUC_MC = sMC.toUpperCase();
-            for (var sProp in oType.category) {
-                if (sProp.toUpperCase().search(sUC_MC) >= 0) {
-                    result = oType.category[sProp];
-                    break;
-                }
-            }
-        }
-        if (result && Array.isArray(result)) {
-            result = result[0]; //Cant detect MCC exactly
-        }
-        return result;
-    }
-
-    function getOperationFromCache(sCard, sDate, sPlace) {
-        return localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
-    }
-
-    function setOperationToCache(sCard, sDate, sPlace, sData) {
-        localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = sData;
-    }
-
-    function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory) {
-        var sOperation = getOperationFromCache(sCard, sDate, sPlace);
-        if (sOperation) {
-            if (bIsRUR || sOperation.split(":").length == 3) {
-                return Promise.resolve(sOperation);
-            }
-        }
-        return new Promise((resolve, reject) => {
-            fnGetOtpCategory()
-                .then(oResult => {
-                        var otpCat = oResult.cat;
-                        var sSumRUR = oResult.sum_rur | "";
-                        var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
-                        if (sMCC) {
-                            sOperation = sMCC + ":0:" + sSumRUR;
-                        } else {
-                            if (sCard) {
-                                var sCardCategory = getCardCategory(sCard);
-                                if (sCardCategory) {
-                                    var oCardType = CardTypes[sCardCategory];
-                                    if (oCardType) {
-                                        sMCC = getMCC4Category(oCardType, otpCat);
-                                        if (sMCC) {
-                                            sOperation = sMCC + ":7:" + sSumRUR;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (sOperation) {
-                            setOperationToCache(sCard, sDate, sPlace, sOperation);
-                        } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
-                        resolve(sOperation);
-                    },
-                    err => reject(err));
-        });
-    }
-
-    function processList() {
-        var cardName = $("#chooseSource option:selected").text();
-        if (!cardName) return;
-        var matches = cardName.match(/\*{4}\s+(\d+)/);
-        if (matches && matches.length == 2) {
-            var last4Digit = matches[1];
-            if (!last4Digit) return; //Cant detect card number;
-            var sCardCategory = getCardCategory(last4Digit);
-            if (!sCardCategory) {
-                for (var prop in CardTypes) {
-                    var oType = CardTypes[prop];
-                    if (oType.exclude) continue;
-                    if (cardName.match(oType.pattern)) {
-                        sCardCategory = prop;
-                        setCardCategory(last4Digit, sCardCategory);
-                        break;
-                    }
-                }
-            }
-        }
-
-        function _createGetCategoryCallBack(sUrl) {
-            var sUrlLocal = sUrl;
-            return function() {
-                return window.fetch(sUrlLocal)
-                    .then(oResponse => oResponse.text())
-                    .then(sHtml => {
-                        var oResult = {};
-                        var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
-                        if (matches && matches.length == 2) {
-                            oResult.cat = matches[1].trim();
-                        }
-                        matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
-                        if (matches && matches.length == 2) {
-                            oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
-                        }
-
-                        return oResult;
-                    });
-            };
-        }
-        var oCashBackPerMonth = {};
-        var aOperAsync = [];
-        $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
-            var oTr = $(tr);
-            var oTdCredit = oTr.find("#redCredit");
-            var sCost = oTdCredit.text().trim();
-            if (sCost) {
-                var aTd = oTr.find("td");
-                var sPlace = aTd[2].innerText.trim();
-                if (sPlace.match(/OTPdirekt/i)) return;
-                var bRUR = !!(sCost.match("RUR"));
-                if (!bRUR) {
-                    //If foreign currency then add amount as part of Place, because caching amount in RUR
-                    sPlace = sPlace + "." + sCost.replace(/[\s\-]+/g, "");
-                }
-                var sDate = aTd[1].innerText;
-                var sUrl = $(aTd[7]).find("a").attr("href");
-                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl))
-                    .then(sOperation => {
-                        var aData = sOperation.split(":");
-                        if (aData[0]) {
-                            aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
-                        }
-                        var iPercent = aData[1] - 0;
-                        var fCB = 0.0;
-                        if (!bRUR && aData.length == 3) {
-                            sCost = aData[2];
-                        }
-                        var fCost = Math.abs(parseFloat(sCost.replace(/\s+/g, "")));
-                        if (fCost < 100) {
-                            iPercent = 0;
-                        } else {
-                            fCB = Math.round(fCost * iPercent) / 100 + 0.0;
-                            var aDate = sDate.split("/");
-                            var sMonth = "" + aDate[1] + "." + aDate[2];
-                            if (fCB > 0) {
-                                if (!oCashBackPerMonth[sMonth]) {
-                                    oCashBackPerMonth[sMonth] = 0;
-                                    oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
-                                }
-                                oCashBackPerMonth[sMonth] += fCB;
-                            }
-                        }
-
-                        aTd[3].innerHTML = '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
-                    }, err => true));
-            }
-        });
-
-        Promise.all(aOperAsync)
-            .then(_ => {
-                if (oCashBackPerMonth.length) {
-                    delete oCashBackPerMonth.length;
-                    var oDivDetail = $("#details");
-                    var oDivCB = $('<div id="details"></div>');
-                    oDivCB.append($('<div class="highlighted financialInfo"><h2 class="tableName">Планируемый CashBack</h2></div>'));
-                    var oCBTable = $('<table id="cb_per_month" class="eredmenytabla"><thead><tr class="odd"><th>Месяц</th><th>Сумма</th></tr></thead></table>');
-                    var oCBTableBody = $('<tbody></tbody>');
-                    var iRow = 0;
-                    for (var sMonth in oCashBackPerMonth) {
-                        var fSumm = Math.min(3000, Math.round(oCashBackPerMonth[sMonth] * 100) / 100);
-                        var sClass = iRow++ % 2 == 0 ? "paros" : "paratlan odd";
-                        oCBTableBody.append($('<tr class="' + sClass + '"><td>' + sMonth + '</td><td nowrap="nowrap" id="greenDebit">' + fSumm + '</td></tr>'));
-                    }
-                    oCBTable.append(oCBTableBody);
-                    oDivCB.append(oCBTable);
-                    oDivDetail.parent().append(oDivCB);
-                }
-            });
-    }
-
-    function processDetail() {
-        var last4Digit = "";
-        var otpCat = "";
-        var oTdCost = null;
-        var oTdCat = null;
-        var sDate = null;
-        var sCity = null;
-        var sTSP = null;
-        var sCostCurr = null;
-        $("#details > table.allapot_informacio_keskeny > tbody > tr").each(function(index, tr) {
-            var oTr = $(tr);
-            var label = oTr.find("th").text().trim();
-            if (!last4Digit && label.match(/Номер\s+карты/i)) {
-                var value = oTr.find("td").text().trim();
-                var matches = value.match(/\*{4}\s+(\d+)/);
-                if (matches.length == 2) {
-                    last4Digit = matches[1];
-                }
-            }
-            if (!otpCat && label.match(/Категория\s+торговой\s+точки/i)) {
-                oTdCat = oTr.find("td");
-                otpCat = oTdCat.text().trim();
-                return;
-            }
-            if (!oTdCost && label.match(/Сумма\s+в\s+валюте\s+счета/i)) {
-                oTdCost = oTr.find("td");
-                return;
-            }
-            if (!sCostCurr && label.match(/Сумма\s+операции/i)) {
-                sCostCurr = oTr.find("td").text().trim();
-                return;
-            }
-            if (!sDate && label.match(/Дата\s+и\s+время\s+операции/i)) {
-                sDate = oTr.find("td").text().trim();
-                sDate = sDate.split(" ")[0].replace(/\./g, "/");
-                return;
-            }
-            if (!sCity && label.match(/Город\s+торговой\s+точки/i)) {
-                sCity = oTr.find("td").text().trim();
-                return;
-            }
-            if (!sTSP && label.match(/Место/i)) {
-                sTSP = oTr.find("td").text().trim();
-                return;
-            }
-
-            if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP && sCostRUR) return false;
-        });
-
-        if (!sTSP || sTSP.match(/OTPdirekt/i) || !sCity || !otpCat) return;
-
-        var sPlace = sTSP + " - " + sCity;
-        var bRUR = !!(sCostCurr.match("RUR"));
-        if (!bRUR) {
-            //If foreign currency then add amount as part of Place, because caching amount in RUR
-            sPlace = sPlace + "." + sCostCurr.replace(/[\s\-]+/g, "");
-        }
-
-
-        getOperationAsync(last4Digit, sDate, sPlace, true, function() {
-            return Promise.resolve({ cat: otpCat });
-        }).then(sOperation => {
-            var aData = sOperation.split(":");
-            var sMCC = aData[0];
-            var iPercent = aData[1] - 0;
-            if (oTdCat && sMCC) {
-                oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
-            }
-
-            if (oTdCost) {
-                var sCost = oTdCost.text().trim();
-                var fCB = 0.00;
-                var fCost = parseFloat(sCost.replace(/\s+/g, ""));
-                if (fCost >= 100) {
-                    fCB = Math.round(fCost * iPercent) / 100 + 0.00;
-                } else {
-                    iPercent = 0;
-                }
-                oTdCost.html(sCost + '&nbsp<span class="cb' + iPercent + '">(CashBack:&nbsp' + fCB + ")</span>");
-            }
-        });
-    }
-
-    log("OTP MCC Codes");
-    $(document).ready(function() {
-        log("Doc Ready");
-        if (window.location.pathname.match("szamlatortenet")) {
-            //Выписка
-            processList();
-        } else if (window.location.pathname.match("kartyaTranzakcioReszletek")) {
-            //Operation detail
-            processDetail();
-        }
-    });
-
 
     var CardTypes = {
         no_cb: {
@@ -1110,6 +826,292 @@ color:blue;
             }
         },
     };
+
+
+    function log(data) {
+        if (LOG) console.log(data);
+    }
+
+    function getCardCategory(last4Digit) {
+        return localStorage[PREFIX + ".card" + last4Digit];
+    }
+
+    function setCardCategory(last4Digit, sCategory) {
+        localStorage[PREFIX + ".card" + last4Digit] = sCategory;
+    }
+
+    function getMCC4Category(oType, sMC) {
+        if (!sMC) return null;
+        var result = oType.category[sMC];
+        if (!result) {
+            var sUC_MC = sMC.toUpperCase();
+            for (var sProp in oType.category) {
+                if (sProp.toUpperCase().search(sUC_MC) >= 0) {
+                    result = oType.category[sProp];
+                    break;
+                }
+            }
+        }
+        if (result && Array.isArray(result)) {
+            result = result[0]; //Cant detect MCC exactly
+        }
+        return result;
+    }
+
+    function getOperationFromCache(sCard, sDate, sPlace) {
+        return localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
+    }
+
+    function setOperationToCache(sCard, sDate, sPlace, sData) {
+        localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = sData;
+    }
+
+    function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory) {
+        var sOperation = getOperationFromCache(sCard, sDate, sPlace);
+        if (sOperation) {
+            if (bIsRUR || sOperation.split(":").length == 3) {
+                return Promise.resolve(sOperation);
+            }
+        }
+        return new Promise((resolve, reject) => {
+            fnGetOtpCategory()
+                .then(oResult => {
+                        var otpCat = oResult.cat;
+                        var sSumRUR = oResult.sum_rur | "";
+                        var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
+                        if (sMCC) {
+                            sOperation = sMCC + ":0:" + sSumRUR;
+                        } else {
+                            if (sCard) {
+                                var sCardCategory = getCardCategory(sCard);
+                                if (sCardCategory) {
+                                    var oCardType = CardTypes[sCardCategory];
+                                    if (oCardType) {
+                                        sMCC = getMCC4Category(oCardType, otpCat);
+                                        if (sMCC) {
+                                            sOperation = sMCC + ":7:" + sSumRUR;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (sOperation) {
+                            setOperationToCache(sCard, sDate, sPlace, sOperation);
+                        } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
+                        resolve(sOperation);
+                    },
+                    err => reject(err));
+        });
+    }
+
+    function processList() {
+        var cardName = $("#chooseSource option:selected").text();
+        if (!cardName) return;
+        var matches = cardName.match(/\*{4}\s+(\d+)/);
+        if (matches && matches.length == 2) {
+            var last4Digit = matches[1];
+            if (!last4Digit) return; //Cant detect card number;
+            var sCardCategory = getCardCategory(last4Digit);
+            if (!sCardCategory) {
+                for (var prop in CardTypes) {
+                    var oType = CardTypes[prop];
+                    if (oType.exclude) continue;
+                    if (cardName.match(oType.pattern)) {
+                        sCardCategory = prop;
+                        setCardCategory(last4Digit, sCardCategory);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function _createGetCategoryCallBack(sUrl) {
+            var sUrlLocal = sUrl;
+            return function() {
+                return window.fetch(sUrlLocal)
+                    .then(oResponse => oResponse.text())
+                    .then(sHtml => {
+                        var oResult = {};
+                        var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
+                        if (matches && matches.length == 2) {
+                            oResult.cat = matches[1].trim();
+                        }
+                        matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
+                        if (matches && matches.length == 2) {
+                            oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
+                        }
+
+                        return oResult;
+                    });
+            };
+        }
+        var oCashBackPerMonth = {};
+        var aOperAsync = [];
+        $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
+            var oTr = $(tr);
+            var oTdCredit = oTr.find("#redCredit");
+            var sCost = oTdCredit.text().trim();
+            if (sCost) {
+                var aTd = oTr.find("td");
+                var sPlace = aTd[2].innerText.trim();
+                if (sPlace.match(/OTPdirekt/i)) return;
+                var bRUR = !!(sCost.match("RUR"));
+                if (!bRUR) {
+                    //If foreign currency then add amount as part of Place, because caching amount in RUR
+                    sPlace = sPlace + "." + sCost.replace(/[\s\-]+/g, "");
+                }
+                var sDate = aTd[1].innerText;
+                var sUrl = $(aTd[7]).find("a").attr("href");
+                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl))
+                    .then(sOperation => {
+                        var aData = sOperation.split(":");
+                        if (aData[0]) {
+                            aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
+                        }
+                        var iPercent = aData[1] - 0;
+                        var fCB = 0.0;
+                        if (!bRUR && aData.length == 3) {
+                            sCost = aData[2];
+                        }
+                        var fCost = Math.abs(parseFloat(sCost.replace(/\s+/g, "")));
+                        if (fCost < 100) {
+                            iPercent = 0;
+                        } else {
+                            fCB = Math.round(fCost * iPercent) / 100 + 0.0;
+                            var aDate = sDate.split("/");
+                            var sMonth = "" + aDate[1] + "." + aDate[2];
+                            if (fCB > 0) {
+                                if (!oCashBackPerMonth[sMonth]) {
+                                    oCashBackPerMonth[sMonth] = 0;
+                                    oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
+                                }
+                                oCashBackPerMonth[sMonth] += fCB;
+                            }
+                        }
+
+                        aTd[3].innerHTML = '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
+                    }, err => true));
+            }
+        });
+
+        Promise.all(aOperAsync)
+            .then(_ => {
+                if (oCashBackPerMonth.length) {
+                    delete oCashBackPerMonth.length;
+                    var oDivDetail = $("#details");
+                    var oDivCB = $('<div id="details"></div>');
+                    oDivCB.append($('<div class="highlighted financialInfo"><h2 class="tableName">Планируемый CashBack</h2></div>'));
+                    var oCBTable = $('<table id="cb_per_month" class="eredmenytabla"><thead><tr class="odd"><th>Месяц</th><th>Сумма</th></tr></thead></table>');
+                    var oCBTableBody = $('<tbody></tbody>');
+                    var iRow = 0;
+                    for (var sMonth in oCashBackPerMonth) {
+                        var fSumm = Math.min(3000, Math.round(oCashBackPerMonth[sMonth] * 100) / 100);
+                        var sClass = iRow++ % 2 == 0 ? "paros" : "paratlan odd";
+                        oCBTableBody.append($('<tr class="' + sClass + '"><td>' + sMonth + '</td><td nowrap="nowrap" id="greenDebit">' + fSumm + '</td></tr>'));
+                    }
+                    oCBTable.append(oCBTableBody);
+                    oDivCB.append(oCBTable);
+                    oDivDetail.parent().append(oDivCB);
+                }
+            });
+    }
+
+    function processDetail() {
+        var last4Digit = "";
+        var otpCat = "";
+        var oTdCost = null;
+        var oTdCat = null;
+        var sDate = null;
+        var sCity = null;
+        var sTSP = null;
+        var sCostCurr = null;
+        $("#details > table.allapot_informacio_keskeny > tbody > tr").each(function(index, tr) {
+            var oTr = $(tr);
+            var label = oTr.find("th").text().trim();
+            if (!last4Digit && label.match(/Номер\s+карты/i)) {
+                var value = oTr.find("td").text().trim();
+                var matches = value.match(/\*{4}\s+(\d+)/);
+                if (matches.length == 2) {
+                    last4Digit = matches[1];
+                }
+            }
+            if (!otpCat && label.match(/Категория\s+торговой\s+точки/i)) {
+                oTdCat = oTr.find("td");
+                otpCat = oTdCat.text().trim();
+                return;
+            }
+            if (!oTdCost && label.match(/Сумма\s+в\s+валюте\s+счета/i)) {
+                oTdCost = oTr.find("td");
+                return;
+            }
+            if (!sCostCurr && label.match(/Сумма\s+операции/i)) {
+                sCostCurr = oTr.find("td").text().trim();
+                return;
+            }
+            if (!sDate && label.match(/Дата\s+и\s+время\s+операции/i)) {
+                sDate = oTr.find("td").text().trim();
+                sDate = sDate.split(" ")[0].replace(/\./g, "/");
+                return;
+            }
+            if (!sCity && label.match(/Город\s+торговой\s+точки/i)) {
+                sCity = oTr.find("td").text().trim();
+                return;
+            }
+            if (!sTSP && label.match(/Место/i)) {
+                sTSP = oTr.find("td").text().trim();
+                return;
+            }
+
+            if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP && sCostRUR) return false;
+        });
+
+        if (!sTSP || sTSP.match(/OTPdirekt/i) || !sCity || !otpCat) return;
+
+        var sPlace = sTSP + " - " + sCity;
+        var bRUR = !!(sCostCurr.match("RUR"));
+        if (!bRUR) {
+            //If foreign currency then add amount as part of Place, because caching amount in RUR
+            sPlace = sPlace + "." + sCostCurr.replace(/[\s\-]+/g, "");
+        }
+
+
+        getOperationAsync(last4Digit, sDate, sPlace, true, function() {
+            return Promise.resolve({ cat: otpCat });
+        }).then(sOperation => {
+            var aData = sOperation.split(":");
+            var sMCC = aData[0];
+            var iPercent = aData[1] - 0;
+            if (oTdCat && sMCC) {
+                oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
+            }
+
+            if (oTdCost) {
+                var sCost = oTdCost.text().trim();
+                var fCB = 0.00;
+                var fCost = parseFloat(sCost.replace(/\s+/g, ""));
+                if (fCost >= 100) {
+                    fCB = Math.round(fCost * iPercent) / 100 + 0.00;
+                } else {
+                    iPercent = 0;
+                }
+                oTdCost.html(sCost + '&nbsp<span class="cb' + iPercent + '">(CashBack:&nbsp' + fCB + ")</span>");
+            }
+        });
+    }
+
+    log("OTP MCC Codes");
+    $(document).ready(function() {
+        log("Doc Ready");
+        if (window.location.pathname.match("szamlatortenet")) {
+            //Выписка
+            processList();
+        } else if (window.location.pathname.match("kartyaTranzakcioReszletek")) {
+            //Operation detail
+            processDetail();
+        }
+    });
+
+
 
 
 })($);
