@@ -7,6 +7,9 @@
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/kartyaTranzakcioReszletek*
 // @grant        GM_addStyle
+// @source      https://raw.githubusercontent.com/alezhu/otp_direkt_mcc/master/otp_direct_mcc.user.js
+// @updateURL   https://raw.githubusercontent.com/alezhu/otp_direkt_mcc/master/otp_direct_mcc.user.js
+// @downloadURL https://raw.githubusercontent.com/alezhu/otp_direkt_mcc/master/otp_direct_mcc.user.js
 // ==/UserScript==
 
 
