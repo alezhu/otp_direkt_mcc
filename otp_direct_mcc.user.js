@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.2
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
@@ -108,6 +108,7 @@ color:blue;
             category: {
                 "Telecommunications Equipment including telephone sales": "4812",
                 "Telecommunication srvice including local and long distance calls, credit card calls, calls through use of magnetic stripe reading telephones, fax serv": "4814",
+                "Key-entry Telecom Merchant providing single local and long-distance phone calls using a central access number in a non-face-to-face environment using key entry": "4813",
                 "Fax services, Telecommunication Services": "4814",
                 "Computer Network Services": "4816",
                 "Money Orders – Wire Transfer": "4829",
@@ -117,9 +118,19 @@ color:blue;
                     "6011"
                 ],
                 "Financial Institutions – Merchandise and Services": "6012",
+                "Quasi Cash — Member Financial Institution": "6050",
                 "Non-Financial Institutions – Foreign Currency, Money Orders (not wire transfer) and Travelers Cheques": "6051",
+                "Quasi Cash-Merchant": "6051",
                 "Security Brokers/Dealers": "6211",
                 "Insurance Sales, Underwriting, and Premiums": "6300",
+                "Payment Transaction — Member": "6532",
+                "Payment Transaction — Merchant": "6533",
+                "MONEYSEND INTRACOUNTRY": [
+                    "6536",
+                    "6537"
+                ],
+                "Moneysend-Funding": "6538",
+                "POI FUNDING TRANSACTIONS": "6540",
                 "Miscellaneous Personal Services ( not elsewhere classifies)": "7299",
                 "Advertising Services": "7311",
                 "Consumer Credit Reporting Agencies": "7321",
@@ -144,6 +155,7 @@ color:blue;
                 "Drugs, Drug Proprietors, and Druggist’s Sundries": "5122",
                 "Grocery Stores, Supermarkets": "5411",
                 "Misc. Food Stores – Convenience Stores and Specialty Markets": "5499",
+                "Miscallenous food stores-specialty markets, convenience": "5499",
                 "Children’s and Infant’s Wear Stores": "5641",
                 "Drug Stores and Pharmacies": "5912",
                 "Drug stores, pharmacies": "5912",
@@ -162,6 +174,7 @@ color:blue;
                 "Hospitals": "8062",
                 "Medical and Dental Laboratories": "8071",
                 "Medical Services and Health Practitioners (Not Elsewhere Classified)": "8099",
+                "Medical services, health practitioners, not elsewhere classified": "8099",
                 "Child Care Services": "8351"
             },
         },
