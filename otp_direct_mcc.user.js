@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
@@ -70,15 +70,21 @@ color:blue;
         localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = sData;
     }
 
-    function getOperationAsync(sCard, sDate, sPlace, fnGetOtpCategory) {
+    function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory) {
         var sOperation = getOperationFromCache(sCard, sDate, sPlace);
-        if (sOperation) return Promise.resolve(sOperation);
+        if (sOperation) {
+            if (bIsRUR || sOperation.split(":").length == 3) {
+                return Promise.resolve(sOperation);
+            }
+        }
         return new Promise((resolve, reject) => {
             fnGetOtpCategory()
-                .then(otpCat => {
+                .then(oResult => {
+                        var otpCat = oResult.cat;
+                        var sSumRUR = oResult.sum_rur | "";
                         var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
                         if (sMCC) {
-                            sOperation = sMCC + ":0";
+                            sOperation = sMCC + ":0:" + sSumRUR;
                         } else {
                             if (sCard) {
                                 var sCardCategory = getCardCategory(sCard);
@@ -87,7 +93,7 @@ color:blue;
                                     if (oCardType) {
                                         sMCC = getMCC4Category(oCardType, otpCat);
                                         if (sMCC) {
-                                            sOperation = sMCC + ":7";
+                                            sOperation = sMCC + ":7:" + sSumRUR;
                                         }
                                     }
                                 }
@@ -95,7 +101,7 @@ color:blue;
                         }
                         if (sOperation) {
                             setOperationToCache(sCard, sDate, sPlace, sOperation);
-                        } else sOperation = ":1"; //No MCC detection for 1% cashback
+                        } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
                         resolve(sOperation);
                     },
                     err => reject(err));
@@ -923,11 +929,17 @@ color:blue;
                 return window.fetch(sUrlLocal)
                     .then(oResponse => oResponse.text())
                     .then(sHtml => {
+                        var oResult = {};
                         var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
                         if (matches && matches.length == 2) {
-                            return matches[1].trim();
+                            oResult.cat = matches[1].trim();
                         }
-                        return null;
+                        matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
+                        if (matches && matches.length == 2) {
+                            oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
+                        }
+
+                        return oResult;
                     });
             };
         }
@@ -936,20 +948,24 @@ color:blue;
         $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
             var oTr = $(tr);
             var oTdCredit = oTr.find("#redCredit");
-            var sCost = oTdCredit.text().trim().replace(/\s+/g, "");
+            var sCost = oTdCredit.text().trim();
             if (sCost) {
+                var bRUR = !!(sCost.match("RUR"));
                 var aTd = oTr.find("td");
                 var sPlace = aTd[2].innerText.trim();
                 if (sPlace.match(/OTPdirekt/i)) return;
                 var sDate = aTd[1].innerText;
                 var sUrl = $(aTd[7]).find("a").attr("href");
-                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, _createGetCategoryCallBack(sUrl))
+                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl))
                     .then(sOperation => {
                         var aData = sOperation.split(":");
                         aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
                         var iPercent = aData[1] - 0;
                         var fCB = 0.0;
-                        var fCost = Math.abs(parseFloat(sCost));
+                        if (!bRUR && aData.length == 3) {
+                            sCost = aData[2];
+                        }
+                        var fCost = Math.abs(parseFloat(sCost.replace(/\s+/g, "")));
                         if (fCost < 100) {
                             iPercent = 0;
                         } else {
@@ -1033,8 +1049,8 @@ color:blue;
 
         if (!sTSP || sTSP.match(/OTPdirekt/i) || !sCity || !otpCat) return;
 
-        getOperationAsync(last4Digit, sDate, sTSP + " - " + sCity, function() {
-            return Promise.resolve(otpCat);
+        getOperationAsync(last4Digit, sDate, sTSP + " - " + sCity, true, function() {
+            return Promise.resolve({ cat: otpCat });
         }).then(sOperation => {
             var aData = sOperation.split(":");
             var sMCC = aData[0];
