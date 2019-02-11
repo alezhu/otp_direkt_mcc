@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
@@ -166,6 +166,7 @@ color:blue;
                 "Drug Stores and Pharmacies": "5912",
                 "Drug stores, pharmacies": "5912",
                 "Hobby, Toy, and Game Shops": "5945",
+                "Hobby, toy and game stores": "5945",
                 "Hearing Aids – Sales, Service, and Supply Stores": "5975",
                 "Orthopedic Goods Prosthetic Devices": "5976",
                 "Doctors and Physicians (Not Elsewhere Classified)": "8011",
