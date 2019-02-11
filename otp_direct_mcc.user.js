@@ -4,7 +4,7 @@
 // @version      0.4
 // @description  Show MCC in OTP Direct
 // @author       alezhu
-// @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet
+// @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/kartyaTranzakcioReszletek*
 // @grant        GM_addStyle
 // @source      https://raw.githubusercontent.com/alezhu/otp_direkt_mcc/master/otp_direct_mcc.user.js
