@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -785,9 +785,11 @@ color:blue;
                 "Shoe Stores": "5661",
                 "Furriers and Fur Shops": "5681",
                 "Men’s and Women’s Clothing Stores": "5691",
+                "Men's and women's clothing stores": "5691",
                 "Tailors, Seamstress, Mending, and Alterations": "5697",
                 "Wig and Toupee Stores": "5698",
                 "Miscellaneous Apparel and Accessory Shops": "5699",
+                "Miscellaneous apparel and accessory stores": "5699",
                 "Used Merchandise and Secondhand Stores": "5931",
                 "Leather Foods Stores": "5948",
                 "Sewing, Needle, Fabric, and Price Goods Stores": "5949",
@@ -822,6 +824,7 @@ color:blue;
                 "Video Amusement Game Supplies": "7993",
                 "Video Game Arcades/Establishments": "7994",
                 "Amusement Parks, Carnivals, Circuses, Fortune Tellers": "7996",
+                "Amusement parks, сircuses, carnivals, fortune tellers": "7996",
                 "Aquariums, Sea-aquariums, Dolphinariums": "7998",
                 "Recreation Services (Not Elsewhere Classified)": "7999"
             }
@@ -937,12 +940,12 @@ color:blue;
                         var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
                         if (matches && matches.length == 2) {
                             oResult.cat = matches[1].trim();
-                        }
-                        matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
-                        if (matches && matches.length == 2) {
-                            oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
-                        }
 
+                            matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
+                            if (matches && matches.length == 2) {
+                                oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
+                            }
+                        }
                         return oResult;
                     });
             };
