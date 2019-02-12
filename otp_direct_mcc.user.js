@@ -87,6 +87,7 @@ color:blue;
                 "Misc. Food Stores – Convenience Stores and Specialty Markets": "5499",
                 "Miscallenous food stores-specialty markets, convenience": "5499",
                 "Children’s and Infant’s Wear Stores": "5641",
+                "Children's and infant's wear stores": "5641",
                 "Drug Stores and Pharmacies": "5912",
                 "Drug stores, pharmacies": "5912",
                 "Hobby, Toy, and Game Shops": "5945",
