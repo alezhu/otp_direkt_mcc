@@ -868,6 +868,7 @@ color:blue;
     }
 
     function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory) {
+        sPlace = sPlace.replace(/\s+/g, " ");
         var sOperation = getOperationFromCache(sCard, sDate, sPlace);
         if (sOperation) {
             if (bIsRUR || sOperation.split(":").length == 3) {
