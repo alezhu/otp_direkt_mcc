@@ -37,6 +37,7 @@ color:blue;
             exclude: true,
             category: {
                 "Telecommunications Equipment including telephone sales": "4812",
+                "Telecommunication equipment including telephone sales": "4812",
                 "Telecommunication srvice including local and long distance calls, credit card calls, calls through use of magnetic stripe reading telephones, fax serv": "4814",
                 "Key-entry Telecom Merchant providing single local and long-distance phone calls using a central access number in a non-face-to-face environment using key entry": "4813",
                 "Fax services, Telecommunication Services": "4814",
