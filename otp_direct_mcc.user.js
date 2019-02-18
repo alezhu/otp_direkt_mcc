@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      0.10
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -800,6 +800,7 @@ color:blue;
                 "Clothing Rental – Costumes, Formal Wear, Uniforms": "7296",
                 "Massage Parlors": "7297",
                 "Health and Beauty Shops": "7298",
+				"Health and beauty spas": "7298",
                 "Commercial Sports, Athletic Fields, Professional Sport Clubs, and Sport Promoters": "7941",
                 "Golf Courses – Public": "7992",
                 "Membership Clubs (Sports, Recreation, Athletic), Country Clubs, and Private Golf Courses": "7997"
