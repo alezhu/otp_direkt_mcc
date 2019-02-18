@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.10
+// @version      0.11
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -800,7 +800,7 @@ color:blue;
                 "Clothing Rental – Costumes, Formal Wear, Uniforms": "7296",
                 "Massage Parlors": "7297",
                 "Health and Beauty Shops": "7298",
-				"Health and beauty spas": "7298",
+                "Health and beauty spas": "7298",
                 "Commercial Sports, Athletic Fields, Professional Sport Clubs, and Sport Promoters": "7941",
                 "Golf Courses – Public": "7992",
                 "Membership Clubs (Sports, Recreation, Athletic), Country Clubs, and Private Golf Courses": "7997"
@@ -884,27 +884,31 @@ color:blue;
             fnGetOtpCategory()
                 .then(oResult => {
                         var otpCat = oResult.cat;
-                        var sSumRUR = oResult.sum_rur | "";
-                        var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
-                        if (sMCC) {
-                            sOperation = sMCC + ":0:" + sSumRUR;
-                        } else {
-                            if (sCard) {
-                                var sCardCategory = getCardCategory(sCard);
-                                if (sCardCategory) {
-                                    var oCardType = CardTypes[sCardCategory];
-                                    if (oCardType) {
-                                        sMCC = getMCC4Category(oCardType, otpCat);
-                                        if (sMCC) {
-                                            sOperation = sMCC + ":7:" + sSumRUR;
+                        if (otpCat) {
+                            var sSumRUR = oResult.sum_rur || "";
+                            var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
+                            if (sMCC) {
+                                sOperation = sMCC + ":0:" + sSumRUR;
+                            } else {
+                                if (sCard) {
+                                    var sCardCategory = getCardCategory(sCard);
+                                    if (sCardCategory) {
+                                        var oCardType = CardTypes[sCardCategory];
+                                        if (oCardType) {
+                                            sMCC = getMCC4Category(oCardType, otpCat);
+                                            if (sMCC) {
+                                                sOperation = sMCC + ":7:" + sSumRUR;
+                                            }
                                         }
                                     }
                                 }
                             }
+                            if (sOperation) {
+                                setOperationToCache(sCard, sDate, sPlace, sOperation);
+                            } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
+                        } else {
+                            sOperation = null;
                         }
-                        if (sOperation) {
-                            setOperationToCache(sCard, sDate, sPlace, sOperation);
-                        } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
                         resolve(sOperation);
                     },
                     err => reject(err));
@@ -971,6 +975,7 @@ color:blue;
                 var sUrl = $(aTd[7]).find("a").attr("href");
                 aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl))
                     .then(sOperation => {
+                        if (!sOperation) return;
                         var aData = sOperation.split(":");
                         if (aData[0]) {
                             aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
