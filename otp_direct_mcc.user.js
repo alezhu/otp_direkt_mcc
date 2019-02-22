@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.11
+// @version      0.12
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -136,6 +136,7 @@ color:blue;
                 "Industrial Supplies, Not Elsewhere Classified": "5085",
                 "Paints, Varnishes, and Supplies": "5198",
                 "Home Supply Warehouse Stores": "5200",
+				"Home Supply, Warehouse": "5200",
                 "Lumber and Building Materials Stores": "5211",
                 "Glass, Paint, and Wallpaper Stores": "5231",
                 "Hardware Stores": "5251",
