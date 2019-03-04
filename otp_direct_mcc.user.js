@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.12
+// @version      0.13
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -97,6 +97,7 @@ color:blue;
                 "Orthopedic Goods Prosthetic Devices": "5976",
                 "Doctors and Physicians (Not Elsewhere Classified)": "8011",
                 "Dentists and Orthodontists": "8021",
+                "Dentists, orthodontists": "8021",
                 "Osteopaths": "8031",
                 "Chiropractors": "8041",
                 "Optometrists and Ophthalmologists": "8042",
