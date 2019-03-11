@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.13
+// @version      0.14
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -868,51 +868,85 @@ color:blue;
     }
 
     function getOperationFromCache(sCard, sDate, sPlace) {
-        return localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
+        var sData = localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
+        var oOperation = null;
+        if (sData) {
+            if (sData.indexOf("{") != 0) {
+                var aData = sData.split(":");
+                oOperation = {
+                    mcc: aData[0] || "",
+                    perc: aData[1] || 0,
+                    sumRUR: aData[2] || 0
+                };
+                setOperationToCache(sCard, sDate, sPlace, oOperation);
+            } else {
+                oOperation = JSON.parse(sData);
+            }
+        }
+        return oOperation;
     }
 
-    function setOperationToCache(sCard, sDate, sPlace, sData) {
-        localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = sData;
+    function setOperationToCache(sCard, sDate, sPlace, oOperation) {
+        localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = JSON.stringify(oOperation);
     }
 
-    function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory) {
+    function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory, bReturn) {
         sPlace = sPlace.replace(/\s+/g, " ");
-        var sOperation = getOperationFromCache(sCard, sDate, sPlace);
-        if (sOperation) {
-            if (bIsRUR || sOperation.split(":").length == 3) {
-                return Promise.resolve(sOperation);
+        var oOperation = getOperationFromCache(sCard, sDate, sPlace);
+        if (oOperation) {
+            if ((bIsRUR || oOperation.sumRUR) && (!!oOperation.return) == bReturn) {
+                return Promise.resolve(oOperation);
             }
         }
         return new Promise((resolve, reject) => {
             fnGetOtpCategory()
                 .then(oResult => {
+                        var oOperation = {};
+                        if (bReturn) {
+                            oOperation.return = bReturn;
+                        }
                         var otpCat = oResult.cat;
                         if (otpCat) {
-                            var sSumRUR = oResult.sum_rur || "";
-                            var sMCC = getMCC4Category(CardTypes.no_cb, otpCat);
-                            if (sMCC) {
-                                sOperation = sMCC + ":0:" + sSumRUR;
+                            oOperation.sumRUR = oResult.sum_rur || "";
+                            oOperation.mcc = getMCC4Category(CardTypes.no_cb, otpCat);
+                            if (oOperation.mcc) {
+                                oOperation.perc = 0;
                             } else {
                                 if (sCard) {
                                     var sCardCategory = getCardCategory(sCard);
                                     if (sCardCategory) {
                                         var oCardType = CardTypes[sCardCategory];
                                         if (oCardType) {
+                                            var sMCC = getMCC4Category(oCardType, otpCat);
+                                            if (sMCC) {
+                                                oOperation.mcc = sMCC;
+                                                oOperation.perc = 7;
+                                            } else {
+                                                for (var sCat in CardTypes) {
+                                                    if (sCat !== sCardCategory) {
+                                                        oCardType = CardTypes[sCat];
                                                         sMCC = getMCC4Category(oCardType, otpCat);
                                                         if (sMCC) {
-                                                sOperation = sMCC + ":7:" + sSumRUR;
+                                                            oOperation.mcc = sMCC;
+                                                            oOperation.perc = 1;
+                                                            break;
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                            if (sOperation) {
-                                setOperationToCache(sCard, sDate, sPlace, sOperation);
-                            } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
+                                    }
+                                }
+                            }
+                            if (oOperation.mcc) {
+                                setOperationToCache(sCard, sDate, sPlace, oOperation);
+                            } else {
+                                oOperation.perc = 1;
+                            }
                         } else {
-                            sOperation = null;
+                            oOperation = null;
                         }
-                        resolve(sOperation);
+                        resolve(oOperation);
                     },
                     err => reject(err));
         });
@@ -963,39 +997,78 @@ color:blue;
         var aOperAsync = [];
         $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
             var oTr = $(tr);
-            var oTdCredit = oTr.find("#redCredit");
-            var sCost = oTdCredit.text().trim();
-            if (sCost) {
-                var aTd = oTr.find("td");
-                var sPlace = aTd[2].innerText.trim();
-                if (sPlace.match(/OTPdirekt/i)) return;
+            var bPay = true;
+            var sDate = "";
+            var sUrl = "";
+            var sPlace = "";
+            var bCredit = true;
+            var sCost = "";
+            var oTdPlace = null;
+            var oTdCost = null;
+            oTr.find("td").each((index, el) => {
+                var oTd = $(el);
+                var sText = oTd.text().trim();
+                switch (index) {
+                    case 1:
+                        sDate = sText;
+                        break;
+                    case 2:
+                        if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 || sPlace.match(/OTPdirekt/i)) {
+                            bPay = false;
+                            return false;
+                        } else {
+                            sPlace = sText;
+                        }
+                        oTdPlace = el;
+                        break;
+                    case 3:
+                        if (el.id == "greenDebit" && sText) {
+                            sCost = sText;
+                            bCredit = false;
+                        }
+                        oTdCost = el;
+                        break;
+                    case 4:
+                        if (el.id == "redCredit" && sText) {
+                            sCost = sText;
+                        } else if (!bCredit) {
+                            oTdCost = el;
+                        }
+                        break;
+                    case 7:
+                        sUrl = $(oTd).find("a").attr("href");
+                }
+            });
+            if (sCost && bPay) {
                 var bRUR = !!(sCost.match("RUR"));
                 if (!bRUR) {
                     //If foreign currency then add amount as part of Place, because caching amount in RUR
                     sPlace = sPlace + "." + sCost.replace(/[\s\-]+/g, "");
                 }
-                var sDate = aTd[1].innerText;
-                var sUrl = $(aTd[7]).find("a").attr("href");
-                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl))
-                    .then(sOperation => {
-                        if (!sOperation) return;
-                        var aData = sOperation.split(":");
-                        if (aData[0]) {
-                            aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
+                aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl), !bCredit)
+                    .then(oOperation => {
+                        if (!oOperation) return;
+                        // var aData = sOperation.split(":");
+                        if (oOperation.mcc) {
+                            // aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
+                            oTdPlace.innerHTML = oTdPlace.innerText + "&nbsp-&nbspMCC:" + oOperation.mcc;
                         }
-                        var iPercent = aData[1] - 0;
+                        var iPercent = oOperation.perc - 0;
                         var fCB = 0.0;
-                        if (!bRUR && aData.length == 3) {
-                            sCost = aData[2];
+                        if (!bRUR && oOperation.sumRUR) {
+                            sCost = oOperation.sumRUR;
                         }
                         var fCost = Math.abs(parseFloat(sCost.replace(/\s+/g, "")));
                         if (fCost < 100) {
                             iPercent = 0;
                         } else {
                             fCB = Math.round(fCost * iPercent) / 100 + 0.0;
+                            if (oOperation.return) {
+                                fCB *= -1;
+                            }
                             var aDate = sDate.split("/");
                             var sMonth = "" + aDate[1] + "." + aDate[2];
-                            if (fCB > 0) {
+                            if (fCB !== 0) {
                                 if (!oCashBackPerMonth[sMonth]) {
                                     oCashBackPerMonth[sMonth] = 0;
                                     oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
@@ -1004,7 +1077,7 @@ color:blue;
                             }
                         }
 
-                        aTd[3].innerHTML = '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
+                        oTdCost.innerHTML = oTdCost.innerHTML + '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
                     }, err => true));
             }
         });
@@ -1077,7 +1150,7 @@ color:blue;
                 return;
             }
 
-            if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP && sCostRUR) return false;
+            if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP && sCostCurr) return false;
         });
 
         if (!sTSP || sTSP.match(/OTPdirekt/i) || !sCity || !otpCat) return;
@@ -1091,21 +1164,25 @@ color:blue;
 
 
         getOperationAsync(last4Digit, sDate, sPlace, true, function() {
-            return Promise.resolve({ cat: otpCat });
-        }).then(sOperation => {
-            var aData = sOperation.split(":");
-            var sMCC = aData[0];
-            var iPercent = aData[1] - 0;
+            return Promise.resolve({ cat: otpCat, sum_rur: oTdCost.text().trim() });
+        }).then(oOperation => {
+            // var aData = sOperation.split(":");
+            if (!oOperation) return;
+            var sMCC = oOperation.mcc;
+            var iPercent = oOperation.perc - 0;
             if (oTdCat && sMCC) {
                 oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
             }
 
             if (oTdCost) {
-                var sCost = oTdCost.text().trim();
+                var sCost = oOperation.sumRUR;
                 var fCB = 0.00;
                 var fCost = parseFloat(sCost.replace(/\s+/g, ""));
                 if (fCost >= 100) {
                     fCB = Math.round(fCost * iPercent) / 100 + 0.00;
+                    if (oOperation.return) {
+                        fCB *= -1;
+                    }
                 } else {
                     iPercent = 0;
                 }
