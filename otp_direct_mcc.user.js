@@ -137,8 +137,9 @@ color:blue;
                 "Industrial Supplies, Not Elsewhere Classified": "5085",
                 "Paints, Varnishes, and Supplies": "5198",
                 "Home Supply Warehouse Stores": "5200",
-				"Home Supply, Warehouse": "5200",
+                "Home Supply, Warehouse": "5200",
                 "Lumber and Building Materials Stores": "5211",
+                "Lumber, building materials stores": "5211",
                 "Glass, Paint, and Wallpaper Stores": "5231",
                 "Hardware Stores": "5251",
                 "Nurseries – Lawn and Garden Supply Store": "5261",
@@ -897,14 +898,14 @@ color:blue;
                                     if (sCardCategory) {
                                         var oCardType = CardTypes[sCardCategory];
                                         if (oCardType) {
-                                            sMCC = getMCC4Category(oCardType, otpCat);
-                                            if (sMCC) {
+                                                        sMCC = getMCC4Category(oCardType, otpCat);
+                                                        if (sMCC) {
                                                 sOperation = sMCC + ":7:" + sSumRUR;
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
-                                }
-                            }
                             if (sOperation) {
                                 setOperationToCache(sCard, sDate, sPlace, sOperation);
                             } else sOperation = ":1:" + sSumRUR; //No MCC detection for 1% cashback
