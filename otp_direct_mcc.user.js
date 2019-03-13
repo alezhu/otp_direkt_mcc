@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.14
+// @version      0.15
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -1013,7 +1013,7 @@ color:blue;
                         sDate = sText;
                         break;
                     case 2:
-                        if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 || sPlace.match(/OTPdirekt/i)) {
+                        if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 || sPlace.match(/OTPdirekt/i) || sPlace.match(/CARD2CARD\s+OTP/i)) {
                             bPay = false;
                             return false;
                         } else {
