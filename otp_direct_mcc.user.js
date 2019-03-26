@@ -955,11 +955,12 @@ color:blue;
     function processList() {
         var cardName = $("#chooseSource option:selected").text();
         if (!cardName) return;
+        var sCardCategory = null;
         var matches = cardName.match(/\*{4}\s+(\d+)/);
         if (matches && matches.length == 2) {
             var last4Digit = matches[1];
             if (!last4Digit) return; //Cant detect card number;
-            var sCardCategory = getCardCategory(last4Digit);
+            sCardCategory = getCardCategory(last4Digit);
             if (!sCardCategory) {
                 for (var prop in CardTypes) {
                     var oType = CardTypes[prop];
@@ -972,6 +973,7 @@ color:blue;
                 }
             }
         }
+        if (!sCardCategory) return;
 
         function _createGetCategoryCallBack(sUrl) {
             var sUrlLocal = sUrl;
