@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.16
+// @version      0.17
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -952,6 +952,17 @@ color:blue;
         });
     }
 
+    function isPayTransaction(sText) {
+        if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 ||
+            sText.match(/OTPdirekt/i) ||
+            sText.match(/CARD2CARD\s+OTP/i) ||
+            sText.indexOf('Начисление процентов на положит') >= 0
+        ) {
+            return false;
+        }
+        return true;
+    }
+
     function processList() {
         var cardName = $("#chooseSource option:selected").text();
         if (!cardName) return;
@@ -1015,7 +1026,7 @@ color:blue;
                         sDate = sText;
                         break;
                     case 2:
-                        if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 || sText.match(/OTPdirekt/i) || sText.match(/CARD2CARD\s+OTP/i)) {
+                        if (!isPayTransaction(sText)) {
                             bPay = false;
                             return false;
                         } else {
@@ -1155,7 +1166,7 @@ color:blue;
             if (otpCat && last4Digit && oTdCost && sDate && sCity && sTSP && sCostCurr) return false;
         });
 
-        if (!sTSP || sTSP.match(/OTPdirekt/i) || sTSP.match(/CARD2CARD/i) || !sCity || !otpCat) return;
+        if (!sTSP || sTSP.match(/OTPdirekt/i) || sTSP.match(/CARD2CARD/i) || sTSP.match(/Payment\s+Transaction.+Member/i) || !sCity || !otpCat) return;
 
         var sPlace = sTSP + " - " + sCity;
         var bRUR = !!(sCostCurr.match("RUR"));
