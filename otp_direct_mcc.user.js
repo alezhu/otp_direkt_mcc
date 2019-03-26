@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.17
+// @version      0.18
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -44,6 +44,7 @@ color:blue;
                 "Computer Network Services": "4816",
                 "Money Orders – Wire Transfer": "4829",
                 "Pawn Shops and Salvage Yards": "5933",
+                "Financial Institutions – Automated cash disbursements": "6011",
                 "Financial Institutions – Manual Cash Disbursements": [
                     "6010",
                     "6011"
