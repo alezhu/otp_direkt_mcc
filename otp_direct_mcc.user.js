@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.18
+// @version      0.19
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -144,7 +144,7 @@ color:blue;
                 "Glass, Paint, and Wallpaper Stores": "5231",
                 "Hardware Stores": "5251",
                 "Nurseries – Lawn and Garden Supply Store": "5261",
-                "Department Stores": "5311",
+                "Department stores": "5311",
                 "Furniture, Home Furnishings, and Equipment Stores, ExceptAppliances": "5712",
                 "Floor Covering Stores": "5713",
                 "Drapery, Window Covering and Upholstery Stores": "5714",
@@ -782,6 +782,7 @@ color:blue;
             category: {
                 "Men’s Women’s and Children’s Uniforms and Commercial Clothing": "5137",
                 "Commercial Footwear": "5139",
+                "Department stores": "5311",
                 "Men’s and Boy’s Clothing and Accessories Stores": "5611",
                 "Women’s Ready-to-Wear Stores": "5621",
                 "Women’s Accessory and Specialty Shops": "5631",
@@ -807,7 +808,8 @@ color:blue;
                 "Health and beauty spas": "7298",
                 "Commercial Sports, Athletic Fields, Professional Sport Clubs, and Sport Promoters": "7941",
                 "Golf Courses – Public": "7992",
-                "Membership Clubs (Sports, Recreation, Athletic), Country Clubs, and Private Golf Courses": "7997"
+                "Membership Clubs (Sports, Recreation, Athletic), Country Clubs, and Private Golf Courses": "7997",
+                "Membership clubs (sports, recreation, athletic), country clubs, private golf courses": "7997"
             },
         },
         relax: {
