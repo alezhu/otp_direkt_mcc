@@ -152,6 +152,7 @@ color:blue;
                 "Miscellaneous Home Furnishing Specialty Stores": "5719",
                 "Household Appliance Stores": "5722",
                 "Electronic Sales": "5732",
+                "Radio, television and stereo stores": "5732",
                 "Music Stores, Musical Instruments, Piano Sheet Music": "5733",
                 "Record Shops": "5735",
                 "Camera and Photographic Supply Stores": "5946",
