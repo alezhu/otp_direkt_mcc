@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.20
+// @version      0.21
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
