@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.21
+// @version      0.22
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -144,6 +144,7 @@ color:blue;
                 "Glass, Paint, and Wallpaper Stores": "5231",
                 "Hardware Stores": "5251",
                 "Nurseries – Lawn and Garden Supply Store": "5261",
+                "Nurseries, lawn, garden supply stores": "5261",
                 "Department stores": "5311",
                 "Furniture, Home Furnishings, and Equipment Stores, ExceptAppliances": "5712",
                 "Floor Covering Stores": "5713",
