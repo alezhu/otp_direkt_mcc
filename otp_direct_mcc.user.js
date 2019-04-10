@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.19
+// @version      0.20
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -813,12 +813,14 @@ color:blue;
             },
         },
         relax: {
-            pattern: /развлечения/i,
+            pattern: /рестораны/i,
             category: {
                 "Bakeries": "5462",
                 "Caterers": "5811",
                 "Eating places and Restaurants": "5812",
+                "Eating places, restaurants": "5812",
                 "Drinking Places (Alcoholic Beverages), Bars, Taverns, Cocktail lounges, Nightclubs and Discotheques": "5813",
+                "Drinking places (alcoholic beverages) - bars, taverns, nightclubs, cocktail lunges, discotheques": "5813",
                 "Fast Food Restaurants": "5814",
                 "Motion Pictures and Video Tape Production and Distribution": "7829",
                 "Motion Picture Theaters": "7832",
@@ -834,6 +836,7 @@ color:blue;
                 "Amusement Parks, Carnivals, Circuses, Fortune Tellers": "7996",
                 "Amusement parks, сircuses, carnivals, fortune tellers": "7996",
                 "Aquariums, Sea-aquariums, Dolphinariums": "7998",
+                "Recreation services (including swimming pools, miniature golf and driving ranges, ski slopes, spot and games instruction, boat rentals and aircraft re": "7999",
                 "Recreation Services (Not Elsewhere Classified)": "7999"
             }
         },
@@ -858,7 +861,7 @@ color:blue;
         if (!result) {
             var sUC_MC = sMC.toUpperCase();
             for (var sProp in oType.category) {
-                if (sProp.toUpperCase().search(sUC_MC) >= 0) {
+                if (sUC_MC.startsWith(sProp.toUpperCase())) {
                     result = oType.category[sProp];
                     break;
                 }
