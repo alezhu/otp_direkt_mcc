@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.22
+// @version      0.23
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -1004,12 +1004,23 @@ color:blue;
                         var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
                         if (matches && matches.length == 2) {
                             oResult.cat = matches[1].trim();
+                        } else {
+                            matches = sHtml.match(/<th>\s*Место\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
+                            if (matches && matches.length == 2) {
+                                var place = matches[1].trim();
+                                if (place.startsWith('STEAMGAMES.COM')) {
+                                    oResult.cat = 'Video Game Arcades/Establishments';
+                                }
+                            }
+                        }
 
+                        if (oResult.cat) {
                             matches = sHtml.match(/<th>\s*Сумма\s+в\s+валюте\s+счета\s*<\/th>[^<]*<td>([^<]+)RUR[^<]*<\/td>/i);
                             if (matches && matches.length == 2) {
                                 oResult.sum_rur = matches[1].trim().replace(/\s+/g, "");
                             }
                         }
+
                         return oResult;
                     });
             };
@@ -1167,7 +1178,14 @@ color:blue;
                 return;
             }
             if (!sTSP && label.match(/Место/i)) {
-                sTSP = oTr.find("td").text().trim();
+                var oTSP = oTr.find("td");
+                sTSP = oTSP.text().trim();
+
+                if (!otpCat && sTSP.startsWith('STEAMGAMES.COM')) {
+                    otpCat = 'Video Game Arcades/Establishments';
+                    oTdCat = oTSP;
+                }
+
                 return;
             }
 
