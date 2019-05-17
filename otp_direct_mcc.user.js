@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.23
+// @version      0.24
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -50,13 +50,13 @@ color:blue;
                     "6011"
                 ],
                 "Financial Institutions – Merchandise and Services": "6012",
-                "Quasi Cash — Member Financial Institution": "6050",
+                "Quasi Cash - Member Financial Institution": "6050",
                 "Non-Financial Institutions – Foreign Currency, Money Orders (not wire transfer) and Travelers Cheques": "6051",
                 "Quasi Cash-Merchant": "6051",
                 "Security Brokers/Dealers": "6211",
                 "Insurance Sales, Underwriting, and Premiums": "6300",
-                "Payment Transaction — Member": "6532",
-                "Payment Transaction — Merchant": "6533",
+                "Payment Transaction - Member": "6532",
+                "Payment Transaction - Merchant": "6533",
                 "MONEYSEND INTRACOUNTRY": [
                     "6536",
                     "6537"
