@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.24
+// @version      0.25
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -149,6 +149,7 @@ color:blue;
                 "Nurseries, lawn, garden supply stores": "5261",
                 "Department stores": "5311",
                 "Furniture, Home Furnishings, and Equipment Stores, ExceptAppliances": "5712",
+                "Furniture, home furnishings and and equipment stores, except appliances": "5712",
                 "Floor Covering Stores": "5713",
                 "Drapery, Window Covering and Upholstery Stores": "5714",
                 "Fireplace, Fireplace Screens, and Accessories Stores": "5718",
