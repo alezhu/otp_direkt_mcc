@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.25
+// @version      0.26
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -27,7 +27,7 @@ color:blue;
 }
 `);
 
-(function($) {
+(function ($) {
     'use strict';
     var LOG = 1;
     var PREFIX = "AZ";
@@ -905,43 +905,42 @@ color:blue;
         sPlace = sPlace.replace(/\s+/g, " ");
         var oOperation = getOperationFromCache(sCard, sDate, sPlace);
         if (oOperation) {
-            if ((bIsRUR || oOperation.sumRUR) && (!!oOperation.return) == bReturn) {
+            if ((bIsRUR || oOperation.sumRUR) && (!!oOperation.return == bReturn)) {
                 return Promise.resolve(oOperation);
             }
         }
         return new Promise((resolve, reject) => {
             fnGetOtpCategory()
                 .then(oResult => {
-                        var oOperation = {};
-                        if (bReturn) {
-                            oOperation.return = bReturn;
-                        }
-                        var otpCat = oResult.cat;
-                        if (otpCat) {
-                            oOperation.sumRUR = oResult.sum_rur || "";
-                            oOperation.mcc = getMCC4Category(CardTypes.no_cb, otpCat);
-                            if (oOperation.mcc) {
-                                oOperation.perc = 0;
-                            } else {
-                                if (sCard) {
-                                    var sCardCategory = getCardCategory(sCard);
-                                    if (sCardCategory) {
-                                        var oCardType = CardTypes[sCardCategory];
-                                        if (oCardType) {
-                                            var sMCC = getMCC4Category(oCardType, otpCat);
-                                            if (sMCC) {
-                                                oOperation.mcc = sMCC;
-                                                oOperation.perc = 7;
-                                            } else {
-                                                for (var sCat in CardTypes) {
-                                                    if (sCat !== sCardCategory) {
-                                                        oCardType = CardTypes[sCat];
-                                                        sMCC = getMCC4Category(oCardType, otpCat);
-                                                        if (sMCC) {
-                                                            oOperation.mcc = sMCC;
-                                                            oOperation.perc = 1;
-                                                            break;
-                                                        }
+                    var oOperation = {};
+                    if (bReturn) {
+                        oOperation.return = bReturn;
+                    }
+                    var otpCat = oResult.cat;
+                    if (otpCat) {
+                        oOperation.sumRUR = oResult.sum_rur || "";
+                        oOperation.mcc = getMCC4Category(CardTypes.no_cb, otpCat);
+                        if (oOperation.mcc) {
+                            oOperation.perc = 0;
+                        } else {
+                            if (sCard) {
+                                var sCardCategory = getCardCategory(sCard);
+                                if (sCardCategory) {
+                                    var oCardType = CardTypes[sCardCategory];
+                                    if (oCardType) {
+                                        var sMCC = getMCC4Category(oCardType, otpCat);
+                                        if (sMCC) {
+                                            oOperation.mcc = sMCC;
+                                            oOperation.perc = 7;
+                                        } else {
+                                            for (var sCat in CardTypes) {
+                                                if (sCat !== sCardCategory) {
+                                                    oCardType = CardTypes[sCat];
+                                                    sMCC = getMCC4Category(oCardType, otpCat);
+                                                    if (sMCC) {
+                                                        oOperation.mcc = sMCC;
+                                                        oOperation.perc = 1;
+                                                        break;
                                                     }
                                                 }
                                             }
@@ -949,16 +948,17 @@ color:blue;
                                     }
                                 }
                             }
-                            if (oOperation.mcc) {
-                                setOperationToCache(sCard, sDate, sPlace, oOperation);
-                            } else {
-                                oOperation.perc = 1;
-                            }
-                        } else {
-                            oOperation = null;
                         }
-                        resolve(oOperation);
-                    },
+                        if (oOperation.mcc) {
+                            setOperationToCache(sCard, sDate, sPlace, oOperation);
+                        } else {
+                            oOperation.perc = 1;
+                        }
+                    } else {
+                        oOperation = null;
+                    }
+                    resolve(oOperation);
+                },
                     err => reject(err));
         });
     }
@@ -972,6 +972,12 @@ color:blue;
             return false;
         }
         return true;
+    }
+
+    function decodeHtml(html) {
+        var txt = document.createElement("textarea");
+        txt.innerHTML = html;
+        return txt.value;
     }
 
     function processList() {
@@ -999,18 +1005,18 @@ color:blue;
 
         function _createGetCategoryCallBack(sUrl) {
             var sUrlLocal = sUrl;
-            return function() {
+            return function () {
                 return window.fetch(sUrlLocal)
                     .then(oResponse => oResponse.text())
                     .then(sHtml => {
                         var oResult = {};
                         var matches = sHtml.match(/<th>\s*Категория\s+торговой\s+точки\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
                         if (matches && matches.length == 2) {
-                            oResult.cat = matches[1].trim();
+                            oResult.cat = decodeHtml(matches[1].trim());
                         } else {
                             matches = sHtml.match(/<th>\s*Место\s*<\/th>[^<]*<td>([^<]+)<\/td>/i);
                             if (matches && matches.length == 2) {
-                                var place = matches[1].trim();
+                                var place = decodeHtml(matches[1].trim());
                                 if (place.startsWith('STEAMGAMES.COM')) {
                                     oResult.cat = 'Video Game Arcades/Establishments';
                                 }
@@ -1030,7 +1036,7 @@ color:blue;
         }
         var oCashBackPerMonth = {};
         var aOperAsync = [];
-        $("#szamlatortenet_eredmeny > tbody > tr").each(function(index, tr) {
+        $("#szamlatortenet_eredmeny > tbody > tr").each(function (index, tr) {
             var oTr = $(tr);
             var bPay = true;
             var sDate = "";
@@ -1148,7 +1154,7 @@ color:blue;
         var sCity = null;
         var sTSP = null;
         var sCostCurr = null;
-        $("#details > table.allapot_informacio_keskeny > tbody > tr").each(function(index, tr) {
+        $("#details > table.allapot_informacio_keskeny > tbody > tr").each(function (index, tr) {
             var oTr = $(tr);
             var label = oTr.find("th").text().trim();
             if (!last4Digit && label.match(/Номер\s+карты/i)) {
@@ -1205,8 +1211,11 @@ color:blue;
         }
 
 
-        getOperationAsync(last4Digit, sDate, sPlace, true, function() {
-            return Promise.resolve({ cat: otpCat, sum_rur: oTdCost.text().trim() });
+        getOperationAsync(last4Digit, sDate, sPlace, true, function () {
+            return Promise.resolve({
+                cat: otpCat,
+                sum_rur: oTdCost.text().trim()
+            });
         }).then(oOperation => {
             // var aData = sOperation.split(":");
             if (!oOperation) return;
@@ -1234,7 +1243,7 @@ color:blue;
     }
 
     log("OTP MCC Codes");
-    $(document).ready(function() {
+    $(document).ready(function () {
         log("Doc Ready");
         if (window.location.pathname.match("szamlatortenet")) {
             //Выписка
