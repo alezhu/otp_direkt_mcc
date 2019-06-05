@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.26
+// @version      0.27
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -104,6 +104,7 @@ color:blue;
                 "Osteopaths": "8031",
                 "Chiropractors": "8041",
                 "Optometrists and Ophthalmologists": "8042",
+                "Optometrists, ophthalmologists": "8042",
                 "Opticians, Opticians Goods and Eyeglasses": "8043",
                 "Opticians, Optical Goods, and Eyeglasses (no longer validfor first presentments)": "8044",
                 "Podiatrists and Chiropodists": "8049",
