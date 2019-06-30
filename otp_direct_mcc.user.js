@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.27
+// @version      0.28
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -1089,55 +1089,140 @@ color:blue;
                 }
                 aOperAsync.push(getOperationAsync(last4Digit, sDate, sPlace, bRUR, _createGetCategoryCallBack(sUrl), !bCredit)
                     .then(oOperation => {
-                        if (!oOperation) return;
-                        // var aData = sOperation.split(":");
+                        if (!oOperation) return; //Если операция не найдена - не обрабатываем ее
                         if (oOperation.mcc) {
-                            // aTd[2].innerHTML = aTd[2].innerText + "&nbsp-&nbspMCC:" + aData[0];
+                            //Если есть МСС записываем его сразу
                             oTdPlace.innerHTML = oTdPlace.innerText + "&nbsp-&nbspMCC:" + oOperation.mcc;
                         }
-                        var iPercent = oOperation.perc - 0;
-                        var fCB = 0.0;
                         if (!bRUR && oOperation.sumRUR) {
+                            //Если операция в валюте, переписываем сумму на сумму в рублях из операции
                             sCost = oOperation.sumRUR;
                         }
+                        //Парсим сумму в вещественное и записываем в операцию
                         var fCost = Math.abs(parseFloat(sCost.replace(/\s+/g, "")));
-                        if (fCost < 100) {
-                            iPercent = 0;
-                        } else {
-                            fCB = Math.round(fCost * iPercent) / 100 + 0.0;
-                            if (oOperation.return) {
-                                fCB *= -1;
-                            }
-                            var aDate = sDate.split("/");
-                            var sMonth = "" + aDate[1] + "." + aDate[2];
-                            if (fCB !== 0) {
-                                if (!oCashBackPerMonth[sMonth]) {
-                                    oCashBackPerMonth[sMonth] = 0;
-                                    oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
-                                }
-                                oCashBackPerMonth[sMonth] += fCB;
-                            }
+                        oOperation.fCost = fCost;
+
+                        if (oOperation.return) {
+                            //Если это был возврат - меняем знак в сумме операции
+                            oOperation.fCost *= -1;
                         }
 
-                        oTdCost.innerHTML = oTdCost.innerHTML + '<span class="cb' + iPercent + '">CB: ' + fCB + "</span>";
+                        //Определяем год и месяц
+                        var aDate = sDate.split("/");
+                        var oDate = new Date(aDate[2], aDate[1], aDate[0]);
+                        oOperation.oDate = oDate;
+                        // var aDate = sDate.split("/");
+                        var sMonth = "" + aDate[1] + "." + aDate[2];
+                        // Ищем месяц по массиве
+                        var oMonth = oCashBackPerMonth[sMonth];
+                        if (!oMonth) {
+                            //Если не найден - создаем пустой
+                            oMonth = {
+                                iMonth: ("" + aDate[2] + aDate[1]) - 0, //Записываем год+месяц как число
+                                fTotal: 0.0,
+                                fTotal4CB: 0.0,
+                                fEffCB: 0.0,
+                                iPercent: 0,
+                                fCB: 0.0,
+                                aOper: []
+                            };
+                            //Добавляем новый месяц в массив
+                            oCashBackPerMonth.length = (oCashBackPerMonth.length | 0) + 1;
+                            oCashBackPerMonth[sMonth] = oMonth;
+                        }
+                        //Сохраняем в операции ссылку на <td> элемент, куда будем писать CashBack
+                        oOperation.oTdCost = oTdCost;
+                        //Добавляем операцию в массив операций по месяцу
+                        oMonth.aOper.push(oOperation);
                     }, err => true));
             }
         });
 
         Promise.all(aOperAsync)
             .then(_ => {
+                //После асинхронной обработки всех операций
                 if (oCashBackPerMonth.length) {
-                    delete oCashBackPerMonth.length;
+                    //Если есть помесячные
+                    delete oCashBackPerMonth.length; //удаляем длину чтобы не мешалась в массиве
+                    //Создаем таблицу для вывода суммарнйо информации
                     var oDivDetail = $("#details");
                     var oDivCB = $('<div id="details"></div>');
                     oDivCB.append($('<div class="highlighted financialInfo"><h2 class="tableName">Планируемый CashBack</h2></div>'));
-                    var oCBTable = $('<table id="cb_per_month" class="eredmenytabla"><thead><tr class="odd"><th>Месяц</th><th>Сумма</th></tr></thead></table>');
+                    //Добавляем заголовок
+                    var oCBTable = $('<table id="cb_per_month" class="eredmenytabla"><thead><tr class="odd"><th>Месяц</th><th>Потрачено</th><th>CashBack</th><th>Эффективный % CashBack</th></tr></thead></table>');
                     var oCBTableBody = $('<tbody></tbody>');
                     var iRow = 0;
                     for (var sMonth in oCashBackPerMonth) {
-                        var fSumm = Math.min(3000, Math.round(oCashBackPerMonth[sMonth] * 100) / 100);
+                        //Для каждого месяца в массиве
+                        var oMonth = oCashBackPerMonth[sMonth];
+                        //Определяем класс дял четнйо и нечетной строк
                         var sClass = iRow++ % 2 == 0 ? "paros" : "paratlan odd";
-                        oCBTableBody.append($('<tr class="' + sClass + '"><td>' + sMonth + '</td><td nowrap="nowrap" id="greenDebit">' + fSumm + '</td></tr>'));
+                        //Считаем суммарный оборот и оборот для расчета КБ по операциям месяца
+                        for (var i in oMonth.aOper) {
+                            var oOperation = oMonth.aOper[i];
+                            oMonth.fTotal += oOperation.fCost;
+                            var iPercent = oOperation.perc - 0;
+                            if (iPercent) {
+                                //Не бонусируемые операции не учитываем в обороте для КБ
+                                oMonth.fTotal4CB += oOperation.fCost;
+                            }
+                        }
+                        //Определяем % повышенного КБ за месяц
+                        if (oMonth.iMonth < 201907) {
+                            //Если период до 07.2019, то оборот не учитываем - повышенный КБ всегда 7
+                            oMonth.iPercent = 7;
+                        } else {
+                            //С 07.2019 учитываем оборот для расчета % повышенного КБ
+                            if (oMonth.fTotal4CB < 30000) {
+                                oMonth.iPercent = 1;
+                            } else if (oMonth.fTotal4CB < 50000) {
+                                oMonth.iPercent = 3;
+                            } else if (oMonth.fTotal4CB < 70000) {
+                                oMonth.iPercent = 5;
+                            } else {
+                                oMonth.iPercent = 7;
+                            }
+                        }
+                        //Сортируем операции в пределах месяца по дате
+                        oMonth.aOper.sort(function (a, b) { return a.oDate.getTime() - b.oDate.getTime() });
+
+                        //Определяем % КБ по каждой операции
+                        for (i in oMonth.aOper) {
+                            oOperation = oMonth.aOper[i];
+                            //Опредляем плануруемый %КБ по операции
+                            iPercent = oOperation.perc - 0;
+                            if (oOperation.fCost < 100) {
+                                //Если сумма операции менее 100 руб - Кб нет, % = 0
+                                iPercent = 0;
+                            } else {
+                                if (iPercent == 7) {
+                                    //Если операция подпадает под повышенный КБ, берем КБ из месяца (для новых условий - зависимый от оборота)
+                                    iPercent = oMonth.iPercent;
+                                }
+                                //Рассчитываем сумму КБ по операции
+                                var fCB = Math.round(oOperation.fCost * iPercent) / 100;
+                                if (oMonth.fCB == 3000) {
+                                    //Если уже достигли порога в 3000, операции без КБ (считаем нарастающим итогом)
+                                    fCB = 0.0;
+                                } else {
+                                    //Суммируем КБ по операции с КБ за месяц
+                                    oMonth.fCB += fCB;
+                                    if (oMonth.fCB > 3000) {
+                                        //если превысили порог в 3000 - КБ по операции  частичный
+                                        fCB = Math.round((fCB - (oMonth.fCB - 3000)) * 100) / 100;
+                                        oMonth.fCB = 3000;
+                                    }
+                                }
+                                //Записываем Кб по опреации в итоговую ячейку
+                                oOperation.oTdCost.innerHTML = oOperation.oTdCost.innerHTML + '<span class="cb' + oOperation.perc + '">CB: ' + fCB + "</span>";
+                            }
+                        }
+                        oMonth.fTotal = Math.round(oMonth.fTotal * 100) / 100;
+                        oMonth.fCB = Math.round(oMonth.fCB * 100) / 100;
+                        //Рассчитываем эффективный КБ
+                        oMonth.fEffCB = Math.round(oMonth.fCB * 100 / oMonth.fTotal * 100) / 100;
+                        //Добавляем данные по месяцу в таблицу
+                        oCBTableBody.append($('<tr class="' + sClass + '"><td>' + sMonth + '</td><td nowrap="nowrap" id="greenDebit">' + oMonth.fTotal + '</td><td>' + oMonth.fCB + '</td><td>' + oMonth.fEffCB + '</td></tr>'));
                     }
                     oCBTable.append(oCBTableBody);
                     oDivCB.append(oCBTable);
@@ -1218,27 +1303,31 @@ color:blue;
                 sum_rur: oTdCost.text().trim()
             });
         }).then(oOperation => {
-            // var aData = sOperation.split(":");
             if (!oOperation) return;
             var sMCC = oOperation.mcc;
-            var iPercent = oOperation.perc - 0;
             if (oTdCat && sMCC) {
                 oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
             }
+            //Определяем год и месяц
+            var aDate = sDate.split("/");
+            if ((aDate[2] + aDate[1]) - 0 < 201907) {
 
-            if (oTdCost) {
-                var sCost = oOperation.sumRUR;
-                var fCB = 0.00;
-                var fCost = parseFloat(sCost.replace(/\s+/g, ""));
-                if (fCost >= 100) {
-                    fCB = Math.round(fCost * iPercent) / 100 + 0.00;
-                    if (oOperation.return) {
-                        fCB *= -1;
+                var iPercent = oOperation.perc - 0;
+
+                if (oTdCost) {
+                    var sCost = oOperation.sumRUR;
+                    var fCB = 0.00;
+                    var fCost = parseFloat(sCost.replace(/\s+/g, ""));
+                    if (fCost >= 100) {
+                        fCB = Math.round(fCost * iPercent) / 100 + 0.00;
+                        if (oOperation.return) {
+                            fCB *= -1;
+                        }
+                    } else {
+                        iPercent = 0;
                     }
-                } else {
-                    iPercent = 0;
+                    oTdCost.html(sCost + '&nbsp<span class="cb' + iPercent + '">(CashBack:&nbsp' + fCB + ")</span>");
                 }
-                oTdCost.html(sCost + '&nbsp<span class="cb' + iPercent + '">(CashBack:&nbsp' + fCB + ")</span>");
             }
         });
     }
