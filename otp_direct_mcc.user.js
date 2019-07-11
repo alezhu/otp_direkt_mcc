@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.29
+// @version      0.30
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -72,6 +72,7 @@ color:blue;
                 "Charitable and Social Service Organizations": "8398",
                 "Political Organizations": "8651",
                 "Professional Services ( Not Elsewhere Defined)": "8999",
+                "Professional services, not elsewhere classified": "8999",
                 "Fines": "9222",
                 "Bail and Bond Payments": "9223",
                 "Tax Payments": "9311",
