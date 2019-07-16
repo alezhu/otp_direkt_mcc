@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.30
+// @version      0.31
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -31,6 +31,17 @@ color:blue;
     'use strict';
     var LOG = 1;
     var PREFIX = "AZ";
+
+    var MCCFix = {
+        "4900": {
+            "date": function (oDate) {
+                if (oDate < new Date(2019, 6, 1)) {
+                    return 7;
+                }
+                return 1;
+            }
+        }
+    };
 
     var CardTypes = {
         no_cb: {
@@ -881,6 +892,22 @@ color:blue;
         return result;
     }
 
+    function DateFromStr(sDate) {
+        var aDate = sDate.split("/");
+        return new Date(aDate[2], aDate[1] - 1, aDate[0]);
+    }
+
+    function fixOperation(oOperation) {
+        if (oOperation && oOperation.mcc) {
+            var fix = MCCFix[oOperation.mcc];
+            if (fix) {
+                if (fix.date) {
+                    oOperation.perc = fix.date(oOperation.date)
+                }
+            }
+        }
+    }
+
     function getOperationFromCache(sCard, sDate, sPlace) {
         var sData = localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace];
         var oOperation = null;
@@ -896,6 +923,8 @@ color:blue;
             } else {
                 oOperation = JSON.parse(sData);
             }
+            oOperation.date = DateFromStr(sDate);
+            fixOperation(oOperation);
         }
         return oOperation;
     }
@@ -903,6 +932,8 @@ color:blue;
     function setOperationToCache(sCard, sDate, sPlace, oOperation) {
         localStorage[PREFIX + ".op." + sCard + "." + sDate + "." + sPlace] = JSON.stringify(oOperation);
     }
+
+
 
     function getOperationAsync(sCard, sDate, sPlace, bIsRUR, fnGetOtpCategory, bReturn) {
         sPlace = sPlace.replace(/\s+/g, " ");
@@ -915,7 +946,9 @@ color:blue;
         return new Promise((resolve, reject) => {
             fnGetOtpCategory()
                 .then(oResult => {
-                    var oOperation = {};
+                    var oOperation = {
+                        date: DateFromStr(sDate)
+                    };
                     if (bReturn) {
                         oOperation.return = bReturn;
                     }
@@ -953,6 +986,7 @@ color:blue;
                             }
                         }
                         if (oOperation.mcc) {
+                            fixOperation(oOperation);
                             setOperationToCache(sCard, sDate, sPlace, oOperation);
                         } else {
                             oOperation.perc = 1;
@@ -1111,7 +1145,7 @@ color:blue;
 
                         //Определяем год и месяц
                         var aDate = sDate.split("/");
-                        var oDate = new Date(aDate[2], aDate[1], aDate[0]);
+                        var oDate = DateFromStr(sDate);
                         oOperation.oDate = oDate;
                         // var aDate = sDate.split("/");
                         var sMonth = "" + aDate[1] + "." + aDate[2];
@@ -1146,7 +1180,7 @@ color:blue;
                 if (oCashBackPerMonth.length) {
                     //Если есть помесячные
                     delete oCashBackPerMonth.length; //удаляем длину чтобы не мешалась в массиве
-                    //Создаем таблицу для вывода суммарнйо информации
+                    //Создаем таблицу для вывода суммарной информации
                     var oDivDetail = $("#details");
                     var oDivCB = $('<div id="details"></div>');
                     oDivCB.append($('<div class="highlighted financialInfo"><h2 class="tableName">Планируемый CashBack</h2></div>'));
@@ -1191,7 +1225,7 @@ color:blue;
                         //Определяем % КБ по каждой операции
                         for (i in oMonth.aOper) {
                             oOperation = oMonth.aOper[i];
-                            //Опредляем плануруемый %КБ по операции
+                            //Определяем плануруемый %КБ по операции
                             iPercent = oOperation.perc - 0;
                             if (oOperation.fCost < 100) {
                                 //Если сумма операции менее 100 руб - Кб нет, % = 0
@@ -1306,6 +1340,7 @@ color:blue;
             });
         }).then(oOperation => {
             if (!oOperation) return;
+            fixOperation(oOperation);
             var sMCC = oOperation.mcc;
             if (oTdCat && sMCC) {
                 oTdCat.html("" + sMCC + ":&nbsp;" + otpCat);
