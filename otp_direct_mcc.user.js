@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.31
+// @version      0.32
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -267,7 +267,7 @@ color:blue;
                 "LUFTHANSA": "3008",
                 "AIR CANADA": "3009",
                 "KLM (ROYAL DUTCH AIRLINES)": "3010",
-                "AEORFLOT": "3011",
+                "Aeroflot": "3011",
                 "QUANTAS": "3012",
                 "ALITALIA": "3013",
                 "SAUDIA ARABIAN AIRLINES": "3014",
@@ -777,20 +777,20 @@ color:blue;
                 "SOUTH SEAS RESORTS": "3756",
                 "Home2Suites": "3816",
                 "Railroads": "4011",
-                "Local/Suburban Commuter Passenger Transportation – Railroads, Feries, Local Water Transportation.": "4111",
+                "Local and suburban commuter passenger transportation, including ferries": "4111",
                 "Passenger Railways": "4112",
-                "Taxicabs and Limousines": "4121",
-                "Bus Lines, Including Charters, Tour Buses": "4131",
-                "Cruise and Steamship Lines": "4411",
+                "Taxicabs, limousines": "4121",
+                "Bus lines, charters, tour buses": "4131",
+                "Steamships, cruise lines": "4411",
                 "Marinas, Marine Service, and Supplies": "4468",
                 "Airlines, Air Carriers ( not listed elsewhere)": "4511",
                 "Airports, Airport Terminals, Flying Fields": "4582",
                 "Travel Agencies and Tour Operations": "4722",
                 "Package Tour Operators (For use in Germany only)": "4723",
                 "Toll and Bridge Fees": "4784",
-                "Transportation Services, Not elsewhere classified)": "4789",
+                "Transportation services, not elsewhere classified": "4789",
                 "Duty Free Store": "5309",
-                "Lodging – Hotels, Motels, Resorts, Central Reservation Services (not elsewhere classified)": "7011",
+                "Lodging -hotels, motels, resorts": "7011",
                 "Car Rental Companies ( Not Listed Below)": "7512",
                 "Truck and Utility Trailer Rentals": "7513",
                 "Motor Home and Recreational Vehicle Rentals": "7519"
