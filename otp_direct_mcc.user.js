@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.32
+// @version      0.33
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -74,7 +74,7 @@ color:blue;
                 ],
                 "Moneysend-Funding": "6538",
                 "POI FUNDING TRANSACTIONS": "6540",
-                "Miscellaneous Personal Services ( not elsewhere classifies)": "7299",
+                "Miscellaneous personal services, not elsewhere classified": "7299",
                 "Advertising Services": "7311",
                 "Consumer Credit Reporting Agencies": "7321",
                 "Computer Programming, Integrated Systems Design and Data Processing Services": "7372",
