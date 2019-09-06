@@ -1004,6 +1004,7 @@ color:blue;
         if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 ||
             sText.match(/OTPdirekt/i) ||
             sText.match(/CARD2CARD\s+OTP/i) ||
+            sText.match(/OTPBANK\s+RU/i) ||
             sText.indexOf('Начисление процентов на положит') >= 0
         ) {
             return false;
