@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OTP MCC Codes
 // @namespace    http://tampermonkey.net/
-// @version      0.35
+// @version      0.36
 // @description  Show MCC in OTP Direct
 // @author       alezhu
 // @match        https://direkt.otpbank.ru/homebank/do/bankkartya/szamlatortenet*
@@ -1004,6 +1004,7 @@ color:blue;
         if (sText.indexOf("Выплата вознаграждения за покупки по банковской карте") >= 0 ||
             sText.match(/OTPdirekt/i) ||
             sText.match(/CARD2CARD\s+OTP/i) ||
+            sText.match(/OTPBANK\s+RU/i) ||
             sText.match(/Tinkoff\s+Bank\s+Card2Card/i) ||
             sText.indexOf('Начисление процентов на положит') >= 0
         ) {
