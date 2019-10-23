@@ -1194,7 +1194,7 @@ color:blue;
                     for (var sMonth in oCashBackPerMonth) {
                         //Для каждого месяца в массиве
                         var oMonth = oCashBackPerMonth[sMonth];
-                        //Определяем класс дял четнйо и нечетной строк
+                        //Определяем класс для четной и нечетной строк
                         var sClass = iRow++ % 2 == 0 ? "paros" : "paratlan odd";
                         //Считаем суммарный оборот и оборот для расчета КБ по операциям месяца
                         for (var i in oMonth.aOper) {
@@ -1228,7 +1228,7 @@ color:blue;
                         //Определяем % КБ по каждой операции
                         for (i in oMonth.aOper) {
                             oOperation = oMonth.aOper[i];
-                            //Определяем плануруемый %КБ по операции
+                            //Определяем планируемый %КБ по операции
                             iPercent = oOperation.perc - 0;
                             if (oOperation.fCost < 100) {
                                 //Если сумма операции менее 100 руб - Кб нет, % = 0
@@ -1252,7 +1252,7 @@ color:blue;
                                         oMonth.fCB = 3000;
                                     }
                                 }
-                                //Записываем Кб по опреации в итоговую ячейку
+                                //Записываем Кб по операции в итоговую ячейку
                                 oOperation.oTdCost.innerHTML = oOperation.oTdCost.innerHTML + '<span class="cb' + oOperation.perc + '">CB: ' + fCB + "</span>";
                             }
                         }
