@@ -1006,7 +1006,7 @@ color:blue;
             sText.match(/CARD2CARD\s+OTP/i) ||
             sText.match(/OTPBANK\s+RU/i) ||
             sText.match(/Tinkoff\s+Bank\s+Card2Card/i) ||
-            sText.match(/OMP - MONEY SEND/i) ||
+            sText.match(/OMP\s+-\s+MONEY\s+SEND/i) ||
             sText.indexOf('Начисление процентов на положит') >= 0
         ) {
             return false;
